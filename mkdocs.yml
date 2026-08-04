@@ -47,4 +47,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Architecture Overview: architecture.md
+  - Infrastructure (Terraform): terraform.md
+  - Cluster Setup (Ansible & K3s): ansible-k3s.md
+  - Continuous Delivery (GitOps): gitops-manifests.md
   - Getting Started: getting-started.md
