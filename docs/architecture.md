@@ -1,54 +1,115 @@
-# Free Cloud Initiative Architecture
+# Architecture Overview
 
-The **Free Cloud Initiative** is a modern, cloud-agnostic, GitOps-driven infrastructure platform designed to deploy, manage, and scale lightweight Kubernetes (`K3s`) clusters across multi-cloud providers (GCP, Azure, AWS) and edge/bare-metal environments (e.g., Raspberry Pi clusters).
+The **Free Cloud Initiative** is a cloud-agnostic, GitOps-driven infrastructure platform designed to provision, configure, and operate lightweight Kubernetes clusters — and teach every step of how it works.
+
+!!! info "Portfolio Project"
+    This is both a production-ready reference architecture **and** a teaching project. Every design decision is explained so you can understand and replicate it.
 
 ---
 
-## 🏗 System Architecture & Lifecycle
+## System Architecture
 
-The initiative is built on a **4-Layer Infrastructure Lifecycle**:
+The platform operates as a **4-Layer Infrastructure Lifecycle**. Each layer has a dedicated repository and a clear responsibility boundary:
 
 ```mermaid
 flowchart TD
-    subgraph Layer 1: Infrastructure Provisioning
-        TMC[terraform-multicloud-infra] -->|Provisions VMs, VPCs & Firewall Rules| GCP[GCP / Azure / AWS]
-        TCF[terraform-cloudflare-infra] -->|Configures DNS & Zero Trust Tunnels| CF[Cloudflare Edge]
+    subgraph L1["Layer 1 — Infrastructure Provisioning"]
+        TMC["terraform-multicloud-infra\n☁️ VMs · VPCs · Firewall Rules"]
+        TCF["terraform-cloudflare-infra\n🌐 DNS · TLS · Zero Trust Tunnels"]
     end
 
-    subgraph Layer 2: Server Configuration & K3s Bootstrap
-        ANS[ansible-automation] -->|Configures OS & SSH Keys| VM[Cluster Nodes]
-        ANS -->|Installs K3s HA Master / Workers| K3S[K3s Cluster]
+    subgraph L2["Layer 2 — Server Configuration"]
+        ANS1["ansible-automation\n⚙️ OS Setup · SSH · Kernel Params"]
     end
 
-    subgraph Layer 3: Base Cluster Services & GitOps Engine
-        ANS -->|Deploys Operators| ARG[ArgoCD]
-        ANS -->|Deploys Ingress & Security| TRF[Traefik / Cert-Manager / Sealed Secrets]
+    subgraph L3["Layer 3 — Cluster Bootstrap"]
+        K3S["K3s HA Cluster\n3× Control Plane + Workers"]
+        ANS2["Core Operators\nTraefik · Cert-Manager · Sealed Secrets · ArgoCD"]
     end
 
-    subgraph Layer 4: GitOps Application Lifecycle
-        MANIFESTS[k3s-manifests] -->|Git Sync / App-of-Apps Pattern| ARG
-        ARG -->|Deploys & Reconciles Workloads| K3S
+    subgraph L4["Layer 4 — GitOps Application Lifecycle"]
+        MAN["k3s-manifests\n📦 Helm Releases · K8s Manifests"]
+        ACD["ArgoCD\n🔁 Continuous Reconciliation"]
+        APPS["Running Workloads\n🚀 Apps · Observability · Gitea"]
     end
+
+    TMC --> L2
+    TCF --> L2
+    ANS1 --> K3S
+    ANS1 --> ANS2
+    ANS2 --> ACD
+    MAN -->|"Git Sync"| ACD
+    ACD -->|"kubectl apply"| APPS
 ```
 
 ---
 
-## 📦 Repository Breakdown
+## Repository Breakdown
 
-| Repository | Purpose | Key Responsibilities |
-| :--- | :--- | :--- |
-| **`terraform-multicloud-infra`** | Provision Compute & Network | Creates virtual machines, subnets, firewall rules, and static IPs across GCP, Azure, or AWS. |
-| **`terraform-cloudflare-infra`** | Edge DNS & Tunnel Ingress | Manages Cloudflare DNS records (`freecloudinitiative.com`) and Cloudflare Zero Trust Tunnels (`cloudflared`). |
-| **`ansible-automation`** | OS Setup, K3s & Core Operators | Automates host OS configuration, multi-master K3s installation, SSH key management, and initial ArgoCD / Traefik deployment. |
-| **`k3s-manifests`** | GitOps Workloads & Applications | Declarative Kubernetes manifests (`bootstrap/`, `infrastructure/`, `applications/`) continuously synced by ArgoCD. |
-| **`docs`** | Central Knowledge Base | MkDocs-powered static documentation site providing architecture docs and operational runbooks. |
-| **`.github`** | Community & Organization | Global GitHub profile, CI workflow templates, and organization standards. |
+| Repository | Layer | Key Responsibilities |
+| :--- | :---: | :--- |
+| **`terraform-multicloud-infra`** | 1 | Cloud VMs, subnets, firewall rules (GCP/Azure/AWS) |
+| **`terraform-cloudflare-infra`** | 1 | Cloudflare DNS, TLS, Zero Trust Tunnels |
+| **`ansible-automation`** | 2–3 | OS config, K3s multi-master install, ArgoCD/Traefik deployment |
+| **`k3s-manifests`** | 4 | Declarative workloads, infrastructure Helm releases, App-of-Apps |
+| **`docs`** | — | This documentation site (MkDocs + Material) |
 
 ---
 
-## 🔄 End-to-End Workflow Summary
+## Observability Stack
 
-1. **Provision Infrastructure (`terraform-multicloud-infra`)**: Spin up 3 master nodes and worker nodes in GCP/Azure/AWS.
-2. **Configure DNS (`terraform-cloudflare-infra`)**: Link public domain names to ingress gateway endpoints or Cloudflare Tunnels.
-3. **Bootstrap Cluster (`ansible-automation`)**: Prepare node OS settings, install K3s control plane, and deploy ArgoCD.
-4. **Deploy Applications (`k3s-manifests`)**: Push application manifests to Git; ArgoCD automatically reconciles and deploys them to the K3s cluster.
+The cluster includes a full observability stack deployed via ArgoCD from `k3s-manifests/infrastructure/`:
+
+```mermaid
+flowchart LR
+    APP[Applications\nPods] -->|metrics| PROM[Prometheus]
+    APP -->|logs| ALLOY[Grafana Alloy\nOTel Collector]
+    APP -->|traces| ALLOY
+
+    ALLOY -->|logs| LOKI[Loki]
+    ALLOY -->|traces| TEMPO[Tempo]
+    PROM --> GRAF[Grafana]
+    LOKI --> GRAF
+    TEMPO --> GRAF
+
+    style GRAF fill:#009485,color:#fff,stroke:#009485
+```
+
+| Tool | Version | Purpose |
+| :--- | :--- | :--- |
+| **Prometheus** | kube-prometheus-stack | Metrics scraping, alerting, recording rules |
+| **Grafana** | bundled | Dashboards for metrics, logs, and traces |
+| **Loki** | standalone | Log aggregation with LogQL |
+| **Tempo** | standalone | Distributed tracing with TraceQL |
+| **Grafana Alloy** | latest | OpenTelemetry collector (replaces Promtail + Grafana Agent) |
+
+!!! tip "Alloy replaces Promtail"
+    Grafana Alloy is the modern, unified OpenTelemetry-native collector. It receives logs, metrics, and traces using standard OTLP protocol and forwards them to Loki, Tempo, and Prometheus.
+
+---
+
+## Networking Architecture
+
+```mermaid
+flowchart LR
+    USER[Browser / Client] -->|HTTPS| CF[Cloudflare Edge]
+    CF -->|Zero Trust Tunnel| TRAEFIK[Traefik Ingress\n:443]
+    TRAEFIK -->|/argocd| ACD[ArgoCD UI]
+    TRAEFIK -->|/grafana| GRAF[Grafana]
+    TRAEFIK -->|/gitea| GITEA[Gitea]
+    TRAEFIK -->|/| APP[Sample App]
+```
+
+All external traffic enters through Cloudflare Zero Trust Tunnels — **no inbound firewall ports are exposed** to the internet. Traefik handles path-based routing internally within the cluster.
+
+---
+
+## End-to-End Workflow
+
+1. **Provision** (`terraform-multicloud-infra`): Spin up 3 master nodes + workers in your chosen cloud
+2. **DNS** (`terraform-cloudflare-infra`): Map domain names to your cluster ingress, provision Cloudflare tunnels
+3. **Bootstrap** (`ansible-automation`): Configure OS, install K3s HA, deploy ArgoCD
+4. **Deploy** (`k3s-manifests`): Push manifests to Git; ArgoCD reconciles and deploys automatically
+5. **Observe**: Grafana dashboards give full visibility into metrics, logs, and traces
+
+[**→ Start the Learning Path**](learning-path.md){ .md-button .md-button--primary }
