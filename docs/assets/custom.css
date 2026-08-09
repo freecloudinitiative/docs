@@ -1,0 +1,171 @@
+/* ============================================================
+   Free Cloud Initiative — Custom Styles (ArgoCD-inspired)
+   ============================================================ */
+
+/* ---------- Google Fonts: Work Sans (matches ArgoCD) ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+/* ---------- Brand token overrides ---------- */
+:root {
+  --fci-teal:         #009485;
+  --fci-teal-dark:    #00796b;
+  --fci-teal-light:   #4db6ac;
+  --fci-accent:       #00bfa5;
+  --fci-bg-hero:      linear-gradient(135deg, #004d40 0%, #00695c 50%, #00897b 100%);
+}
+
+/* ---------- Hero / home page banner ---------- */
+.md-typeset .hero {
+  text-align: center;
+  padding: 3rem 1rem 2.5rem;
+  margin-bottom: 2rem;
+  background: var(--fci-bg-hero);
+  border-radius: 12px;
+  color: #fff;
+}
+
+.md-typeset .hero h1 {
+  color: #fff !important;
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  border: none;
+}
+
+.md-typeset .hero p {
+  font-size: 1.15rem;
+  opacity: 0.9;
+  margin-bottom: 1.5rem;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.md-typeset .hero .hero-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.md-typeset .hero .hero-buttons a {
+  display: inline-block;
+  padding: 0.65rem 1.6rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.md-typeset .hero .hero-buttons a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+.md-typeset .hero .btn-primary {
+  background: #fff;
+  color: var(--fci-teal-dark) !important;
+}
+
+.md-typeset .hero .btn-outline {
+  border: 2px solid rgba(255,255,255,0.7);
+  color: #fff !important;
+  background: transparent;
+}
+
+/* ---------- Feature cards grid ---------- */
+.md-typeset .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+
+.md-typeset .feature-card {
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 10px;
+  padding: 1.4rem 1.2rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.md-typeset .feature-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 148, 133, 0.15);
+  border-color: var(--fci-teal-light);
+}
+
+.md-typeset .feature-card .card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.md-typeset .feature-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0.4rem;
+  color: var(--fci-teal);
+}
+
+.md-typeset .feature-card p {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin: 0;
+  opacity: 0.85;
+}
+
+/* ---------- Learning step badges ---------- */
+.md-typeset .step-badge {
+  display: inline-block;
+  background: var(--fci-teal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+/* ---------- Nav & header teal accent ---------- */
+.md-header {
+  background-color: var(--fci-teal-dark) !important;
+}
+
+[data-md-color-scheme="slate"] .md-header {
+  background-color: #004d40 !important;
+}
+
+/* ---------- Tab indicator & active link ---------- */
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+/* ---------- Inline code teal tint ---------- */
+.md-typeset code:not(.highlight code) {
+  background-color: rgba(0, 148, 133, 0.1);
+  color: var(--fci-teal-dark);
+  border-radius: 3px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code:not(.highlight code) {
+  background-color: rgba(0, 191, 165, 0.15);
+  color: var(--fci-teal-light);
+}
+
+/* ---------- Repo button pulse on hover ---------- */
+.md-source:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+/* ---------- Scrollbar (Chrome/Edge) ---------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--fci-teal-light);
+  border-radius: 3px;
+}
