@@ -1,115 +1,195 @@
-# Architecture Overview
+# System architecture
 
-The **Free Cloud Initiative** is a cloud-agnostic, GitOps-driven infrastructure platform designed to provision, configure, and operate lightweight Kubernetes clusters — and teach every step of how it works.
+<span class="page-lede">Free Cloud Initiative separates machine provisioning, cluster bootstrap, desired state, and the user-facing control plane into independently operated repositories.</span>
 
-!!! info "Portfolio Project"
-    This is both a production-ready reference architecture **and** a teaching project. Every design decision is explained so you can understand and replicate it.
-
----
-
-## System Architecture
-
-The platform operates as a **4-Layer Infrastructure Lifecycle**. Each layer has a dedicated repository and a clear responsibility boundary:
+## Repository-to-runtime map
 
 ```mermaid
-flowchart TD
-    subgraph L1["Layer 1 — Infrastructure Provisioning"]
-        TMC["terraform-multicloud-infra\n☁️ VMs · VPCs · Firewall Rules"]
-        TCF["terraform-cloudflare-infra\n🌐 DNS · TLS · Zero Trust Tunnels"]
+flowchart TB
+    subgraph Delivery["DELIVERY AND GOVERNANCE"]
+        GH[".github\nreusable CI workflows"]
+        RUN["terraform-multicloud-runner\nself-hosted Actions runners"]
     end
 
-    subgraph L2["Layer 2 — Server Configuration"]
-        ANS1["ansible-automation\n⚙️ OS Setup · SSH · Kernel Params"]
+    subgraph Provision["INFRASTRUCTURE PROVISIONING"]
+        TF["terraform-multicloud-infra\nAWS · Azure · GCP · Civo · Linode"]
+        CF["terraform-cloudflare-infra\nDNS · Zero Trust tunnel"]
     end
 
-    subgraph L3["Layer 3 — Cluster Bootstrap"]
-        K3S["K3s HA Cluster\n3× Control Plane + Workers"]
-        ANS2["Core Operators\nTraefik · Cert-Manager · Sealed Secrets · ArgoCD"]
+    subgraph Bootstrap["BOOTSTRAP"]
+        ANS["ansible-automation\nnode setup · K3s · OpenBao · Argo CD"]
     end
 
-    subgraph L4["Layer 4 — GitOps Application Lifecycle"]
-        MAN["k3s-manifests\n📦 Helm Releases · K8s Manifests"]
-        ACD["ArgoCD\n🔁 Continuous Reconciliation"]
-        APPS["Running Workloads\n🚀 Apps · Observability · Gitea"]
+    subgraph Desired["GITOPS DESIRED STATE"]
+        PROD["k3s-manifests\nproduction / bare metal"]
+        NONPROD["nonprod-k3s-manifests\nAWS non-production"]
     end
 
-    TMC --> L2
-    TCF --> L2
-    ANS1 --> K3S
-    ANS1 --> ANS2
-    ANS2 --> ACD
-    MAN -->|"Git Sync"| ACD
-    ACD -->|"kubectl apply"| APPS
+    subgraph Runtime["K3S RUNTIME"]
+        EDGE["cloudflared → Traefik"]
+        FOUND["Authentik · Postgres · Valkey\nGarage · Longhorn · CNPG"]
+        APPS["frontend · api-gateway\nIAM · compute · database · storage · terminal"]
+        OBS["Prometheus · Grafana\nLoki · Tempo · OTel · Alloy"]
+    end
+
+    GH --> RUN
+    RUN --> TF
+    TF --> ANS
+    CF --> EDGE
+    ANS --> PROD
+    ANS --> NONPROD
+    PROD --> Runtime
+    NONPROD --> Runtime
+    EDGE --> APPS
+    FOUND --> APPS
+    APPS --> OBS
 ```
 
----
+The boxes above represent ownership, not a single pipeline that runs on every change. Production can run on owned Raspberry Pi hardware without `terraform-multicloud-infra`; non-production uses that Terraform repository to create its cloud nodes. Cloudflare is production-only, while each environment has its own GitOps repository and secret store.
 
-## Repository Breakdown
+## Lifecycle boundaries
 
-| Repository | Layer | Key Responsibilities |
-| :--- | :---: | :--- |
-| **`terraform-multicloud-infra`** | 1 | Cloud VMs, subnets, firewall rules (GCP/Azure/AWS) |
-| **`terraform-cloudflare-infra`** | 1 | Cloudflare DNS, TLS, Zero Trust Tunnels |
-| **`ansible-automation`** | 2–3 | OS config, K3s multi-master install, ArgoCD/Traefik deployment |
-| **`k3s-manifests`** | 4 | Declarative workloads, infrastructure Helm releases, App-of-Apps |
-| **`docs`** | — | This documentation site (MkDocs + Material) |
+| Boundary | Owning repositories | Handoff |
+| --- | --- | --- |
+| CI capacity and shared workflows | `.github`, `terraform-multicloud-runner` | Reusable workflows run on hosted or provisioned self-hosted runners. |
+| Machines and edge | `terraform-multicloud-infra`, `terraform-cloudflare-infra` | Node addresses become Ansible inventory; the tunnel routes public hostnames to in-cluster Traefik. |
+| Cluster bootstrap | `ansible-automation` | Installs K3s, prepares node tiers, bootstraps OpenBao and Argo CD, then applies the environment root app. |
+| Desired state | `k3s-manifests`, `nonprod-k3s-manifests` | Argo CD continuously applies infrastructure and application manifests. |
+| Product control plane | `frontend` and six Go service repositories | Browser/API requests become desired resource state and reconciliation work. |
+| Shared service contracts | `platform-common` | Backend services import consistent auth, cache, config, HTTP, telemetry, and Postgres primitives. |
+| Documentation | `docs` | This site connects repository-local details into a system view. |
 
----
+## Production and non-production
 
-## Observability Stack
+=== "Production"
 
-The cluster includes a full observability stack deployed via ArgoCD from `k3s-manifests/infrastructure/`:
+    - Runs on the bare-metal K3s fleet managed by `ansible-automation`.
+    - Uses `k3s-manifests` as the Argo CD source of truth.
+    - Uses MetalLB for LAN load-balancing and Cloudflare Tunnel for selected public endpoints.
+    - Keeps administrative endpoints such as Argo CD, OpenBao, and Longhorn LAN-only.
+
+=== "Non-production"
+
+    - Runs on a five-node AWS K3s cluster: one control-plane node and four workers.
+    - Uses `nonprod-k3s-manifests`, never the production GitOps repository.
+    - Has no Cloudflare or MetalLB; Traefik binds host ports on the control-plane node.
+    - Uses reserved `.test` hostnames and a cluster-local CA so OIDC is exercised without public DNS.
+    - Runs the frontend in production mode against the real backend rather than mock handlers.
+
+!!! warning "Environment isolation is a contract"
+    GitOps source URLs, OpenBao data, TLS roots, hostnames, and credentials are environment-specific. Do not reuse production secrets in non-production or point one cluster at the other environment's manifests.
+
+## Request and identity flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Edge as Cloudflare / Traefik
+    participant UI as frontend
+    participant Auth as Authentik
+    participant GW as api-gateway
+    participant IAM as iam-service
+    participant Svc as domain service
+
+    User->>Edge: HTTPS
+    Edge->>UI: React SPA
+    UI->>Auth: OIDC authorization code flow
+    Auth-->>UI: access token
+    UI->>GW: /api/* + bearer token
+    GW->>GW: validate OIDC, rate limit, idempotency
+    GW->>IAM: resolve account and roles
+    IAM-->>GW: account principal
+    GW->>Svc: short-lived Ed25519 internal JWT
+    Svc-->>GW: uniform JSON response
+    GW-->>UI: response
+```
+
+The API gateway is the only public API entry point. It validates Authentik bearer tokens or FCI API keys, resolves the platform account through IAM, then replaces external credentials with a short-lived, audience-bound internal JWT. Domain services trust the gateway's signing identity and never receive the original Authentik token or API key.
+
+## Control-plane topology
 
 ```mermaid
 flowchart LR
-    APP[Applications\nPods] -->|metrics| PROM[Prometheus]
-    APP -->|logs| ALLOY[Grafana Alloy\nOTel Collector]
-    APP -->|traces| ALLOY
+    UI["frontend"] --> GW["api-gateway"]
+    GW --> IAM["iam-service"]
+    GW --> CMP["compute-service"]
+    GW --> DB["database-service"]
+    GW --> STO["storage-service"]
+    GW -. "WebSocket" .-> TERM["terminal-gateway"]
 
-    ALLOY -->|logs| LOKI[Loki]
-    ALLOY -->|traces| TEMPO[Tempo]
-    PROM --> GRAF[Grafana]
+    CMP --> IAM
+    CMP --> STO
+    DB --> IAM
+    DB --> CMP
+    STO --> IAM
+    TERM --> CMP
+    TERM --> IAM
+
+    CMP --> K8S["Kubernetes API"]
+    DB --> CNPG["CloudNativePG"]
+    STO --> GAR["Garage / NetworkPolicy"]
+    TERM --> EXEC["pods/exec"]
+```
+
+For service responsibilities and the terminal ticket flow, see [Control-plane services](platform-services.md).
+
+## State and reconciliation
+
+The product APIs use a desired-state model. A successful create or update writes durable state and enqueues reconciliation; background workers then converge Kubernetes toward that state.
+
+| State system | Purpose |
+| --- | --- |
+| Platform PostgreSQL | Separate `iam`, `compute`, `database`, and `storage` schemas for product state and work queues. |
+| Valkey | Gateway caches and limits, idempotency records, terminal tickets/session slots, and selected quota/metrics caches. |
+| Kubernetes API | Runtime state for compute workloads, customer namespaces, NetworkPolicies, and operator-managed database resources. |
+| CloudNativePG | Platform PostgreSQL and customer PostgreSQL lifecycle. Customer credentials stay in CNPG-managed Kubernetes Secrets. |
+| Garage | One physical S3-compatible platform bucket; storage-service derives account and logical-bucket prefixes server-side. |
+| Longhorn / local-path | Persistent volumes, selected by workload and environment policy. |
+| OpenBao + External Secrets | Secret source and Kubernetes Secret materialization. OpenBao is bootstrapped before Argo CD reconciliation begins. |
+
+!!! info "API acceptance is not runtime readiness"
+    Compute, database, and storage network mutations are asynchronous. The API records intent first; reconciliation status reports whether the corresponding Kubernetes resources are running or enforced.
+
+## GitOps and secret bootstrap
+
+```mermaid
+flowchart LR
+    A["Ansible"] --> B["Install + initialize OpenBao"]
+    B --> C["Install Argo CD"]
+    C --> D["Apply environment root app"]
+    D --> E["Argo CD syncs operators + platform"]
+    E --> F["External Secrets reads OpenBao"]
+    F --> G["Application workloads become ready"]
+```
+
+OpenBao is the deliberate exception to full GitOps ownership: Ansible installs, initializes, unseals, and seeds it before Argo CD starts. Its Helm values live beside GitOps manifests, but there is no Argo CD `Application` for OpenBao. This prevents first-sync deadlock when External Secrets needs a secret store that is not configured yet.
+
+Garage also has an explicit post-deploy bootstrap. Argo CD installs the Garage workload; `scripts/garage-bootstrap.sh` creates its layout, physical `platform` bucket, and service key before storage-service can pass readiness.
+
+## Observability
+
+```mermaid
+flowchart LR
+    APP["Platform workloads"] -->|"RED + domain metrics"| PROM["Prometheus"]
+    APP -->|"OTLP traces"| OTEL["OpenTelemetry Collector"]
+    APP -->|"container logs"| ALLOY["Grafana Alloy"]
+    OTEL --> TEMPO["Tempo"]
+    ALLOY --> LOKI["Loki"]
+    PROM --> GRAF["Grafana"]
     LOKI --> GRAF
     TEMPO --> GRAF
-
-    style GRAF fill:#009485,color:#fff,stroke:#009485
 ```
 
-| Tool | Version | Purpose |
-| :--- | :--- | :--- |
-| **Prometheus** | kube-prometheus-stack | Metrics scraping, alerting, recording rules |
-| **Grafana** | bundled | Dashboards for metrics, logs, and traces |
-| **Loki** | standalone | Log aggregation with LogQL |
-| **Tempo** | standalone | Distributed tracing with TraceQL |
-| **Grafana Alloy** | latest | OpenTelemetry collector (replaces Promtail + Grafana Agent) |
+Backend services expose metrics separately from their API listeners and use bounded label sets to avoid tenant-driven cardinality. Request IDs and trace context cross the gateway boundary so API, worker, and infrastructure signals can be correlated.
 
-!!! tip "Alloy replaces Promtail"
-    Grafana Alloy is the modern, unified OpenTelemetry-native collector. It receives logs, metrics, and traces using standard OTLP protocol and forwards them to Loki, Tempo, and Prometheus.
+## Security boundaries
 
----
+- Public traffic enters through Cloudflare Tunnel and Traefik in production; no public database or Kubernetes API endpoint is part of the product surface.
+- Authentik performs authentication. IAM owns platform accounts, API keys, roles, quotas, and audit history.
+- Internal HTTP tokens use distinct Ed25519 service identities and audience checks.
+- Terminal access is isolated in a service account with `pods/exec`; browser handshakes use short-lived, single-use, IP-bound tickets.
+- Each account receives an `fci-cust-<account-id>` namespace. Compute workloads, customer databases, quotas, and projected network policy are scoped there.
+- Storage-service derives object prefixes; clients never choose their tenant prefix.
+- Kyverno policies and workload NetworkPolicies add admission and network guardrails.
 
-## Networking Architecture
-
-```mermaid
-flowchart LR
-    USER[Browser / Client] -->|HTTPS| CF[Cloudflare Edge]
-    CF -->|Zero Trust Tunnel| TRAEFIK[Traefik Ingress\n:443]
-    TRAEFIK -->|/argocd| ACD[ArgoCD UI]
-    TRAEFIK -->|/grafana| GRAF[Grafana]
-    TRAEFIK -->|/gitea| GITEA[Gitea]
-    TRAEFIK -->|/| APP[Sample App]
-```
-
-All external traffic enters through Cloudflare Zero Trust Tunnels — **no inbound firewall ports are exposed** to the internet. Traefik handles path-based routing internally within the cluster.
-
----
-
-## End-to-End Workflow
-
-1. **Provision** (`terraform-multicloud-infra`): Spin up 3 master nodes + workers in your chosen cloud
-2. **DNS** (`terraform-cloudflare-infra`): Map domain names to your cluster ingress, provision Cloudflare tunnels
-3. **Bootstrap** (`ansible-automation`): Configure OS, install K3s HA, deploy ArgoCD
-4. **Deploy** (`k3s-manifests`): Push manifests to Git; ArgoCD reconciles and deploys automatically
-5. **Observe**: Grafana dashboards give full visibility into metrics, logs, and traces
-
-[**→ Start the Learning Path**](learning-path.md){ .md-button .md-button--primary }
+[Browse every repository and ownership boundary →](repositories.md){ .md-button .md-button--primary }

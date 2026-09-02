@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 site_name: Free Cloud Initiative
 site_description: >-
-  Learn DevOps end-to-end by following a real-world portfolio project — from
-  Terraform infra provisioning to Kubernetes GitOps with ArgoCD.
+  Architecture and operator documentation for the Free Cloud Initiative — a
+  self-hosted cloud control plane running on K3s.
 site_author: Free Cloud Initiative
 site_url: https://freecloudinitiative.github.io/docs/
 
@@ -17,20 +17,20 @@ theme:
   logo: assets/logo.png
   favicon: assets/favicon.png
   font:
-    text: Work Sans
+    text: JetBrains Mono
     code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -97,11 +97,14 @@ markdown_extensions:
       title: On this page
 
 nav:
-  - Home: index.md
-  - Learning Path:
+  - "[ HOME ]": index.md
+  - "[ ARCHITECTURE ]":
+    - "System overview": architecture.md
+    - "Control plane": platform-services.md
+    - "Repository catalog": repositories.md
+  - "[ BUILD PATH ]":
     - learning-path.md
-    - "Step 1 — Terraform": terraform.md
-    - "Step 2 — Ansible & K3s": ansible-k3s.md
-    - "Step 3 — GitOps & ArgoCD": gitops-manifests.md
-  - Architecture: architecture.md
-  - Getting Started: getting-started.md
+    - "01 / Terraform": terraform.md
+    - "02 / Ansible & K3s": ansible-k3s.md
+    - "03 / GitOps & Argo CD": gitops-manifests.md
+  - "[ CONTRIBUTE ]": getting-started.md
