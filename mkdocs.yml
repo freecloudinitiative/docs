@@ -16,9 +16,7 @@ theme:
   language: en
   logo: assets/logo.png
   favicon: assets/favicon.png
-  font:
-    text: JetBrains Mono
-    code: JetBrains Mono
+  font: false
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

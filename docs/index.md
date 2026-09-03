@@ -93,5 +93,7 @@ Looking for ownership? The [repository catalog](repositories.md) covers every or
 
 </div>
 
-!!! note "An evolving reference platform"
-    Free Cloud Initiative applies production-oriented patterns on small, self-hosted infrastructure. Repository documentation is the source of truth for implementation details and operational constraints; this site explains how those pieces fit together.
+> [!NOTE]
+> **An evolving reference platform**
+>
+> Free Cloud Initiative applies production-oriented patterns on small, self-hosted infrastructure. Repository documentation is the source of truth for implementation details and operational constraints; this site explains how those pieces fit together.

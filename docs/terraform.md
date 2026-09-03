@@ -37,8 +37,10 @@ terraform-multicloud-infra/
 
 Implemented resources vary by provider. GCP and AWS include the fullest node/network/firewall models; AWS also supports a secondary VPC with peering. Civo and Linode define provider-native instances and firewalls. The Azure root is earlier-stage and currently contains only part of the intended cluster resource set.
 
-!!! info "Treat each provider root independently"
-    Each directory has its own providers, variables, outputs, and backend expectations. Initialize, plan, and apply from the selected directory; do not assume provider roots have identical feature depth.
+> [!NOTE]
+> **Treat each provider root independently**
+>
+> Each directory has its own providers, variables, outputs, and backend expectations. Initialize, plan, and apply from the selected directory; do not assume provider roots have identical feature depth.
 
 ### Handoff to Ansible
 
@@ -76,8 +78,10 @@ terraform init
 terraform plan
 ~~~
 
-!!! warning "Production state"
-    The committed backend is local, while production automation owns the live state. Do not apply production from a fresh laptop state: Terraform would not know which edge resources already exist.
+> [!WARNING]
+> **Production state**
+>
+> The committed backend is local, while production automation owns the live state. Do not apply production from a fresh laptop state: Terraform would not know which edge resources already exist.
 
 ## CI runner infrastructure
 
@@ -85,8 +89,10 @@ terraform plan
 
 This repository exists because many FCI builds target ARM64 and some workflows need access to project-local infrastructure. Runner capacity can change without touching the K3s cluster.
 
-!!! danger "Runner registration credentials"
-    GitHub registration tokens and PATs are sensitive Terraform inputs. Supply them through the workflow secret store or environment variables and keep state access tightly controlled.
+> [!CAUTION]
+> **Runner registration credentials**
+>
+> GitHub registration tokens and PATs are sensitive Terraform inputs. Supply them through the workflow secret store or environment variables and keep state access tightly controlled.
 
 ## Validation and workflow ownership
 

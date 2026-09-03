@@ -52,8 +52,10 @@ The production playbook supports the bare-metal Raspberry Pi topology. The non-p
 8. Seed the few CA-dependent OpenBao values after cert-manager has reconciled.
 9. Fetch kubeconfig and configure local k9s.
 
-!!! info "Why OpenBao is bootstrap-owned"
-    External Secrets cannot materialize application secrets until its OpenBao <code>ClusterSecretStore</code> can authenticate. Preparing OpenBao before the first Argo CD sync removes that startup race. GitOps stores the reviewed Helm values, while Ansible performs the install and initialization.
+> [!NOTE]
+> **Why OpenBao is bootstrap-owned**
+>
+> External Secrets cannot materialize application secrets until its OpenBao <code>ClusterSecretStore</code> can authenticate. Preparing OpenBao before the first Argo CD sync removes that startup race. GitOps stores the reviewed Helm values, while Ansible performs the install and initialization.
 
 ## K3s ownership choices
 
@@ -94,8 +96,10 @@ Activate the repository's staged-content guard after cloning:
 git config core.hooksPath hooks
 ~~~
 
-!!! danger "Never commit plaintext bootstrap material"
-    Keep <code>secret.yml</code> encrypted, revoke the OpenBao bootstrap token after seeding, and never reuse production OpenBao data or credentials in non-production.
+> [!CAUTION]
+> **Never commit plaintext bootstrap material**
+>
+> Keep <code>secret.yml</code> encrypted, revoke the OpenBao bootstrap token after seeding, and never reuse production OpenBao data or credentials in non-production.
 
 ## Run and verify
 

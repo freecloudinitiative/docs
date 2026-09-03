@@ -88,5 +88,7 @@ Useful questions to answer:
 5. [GitOps environments](gitops-manifests.md)
 6. [Control-plane services](platform-services.md)
 
-!!! success "You understand the platform when…"
-    You can route a change to its owning repository, explain the bootstrap-to-GitOps cutover, trace a browser request to runtime state, and identify which environment-specific repository will deploy it.
+> [!TIP]
+> **You understand the platform when…**
+>
+> You can route a change to its owning repository, explain the bootstrap-to-GitOps cutover, trace a browser request to runtime state, and identify which environment-specific repository will deploy it.

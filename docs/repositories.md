@@ -23,8 +23,10 @@
 | [`terraform-cloudflare-infra`](https://github.com/freecloudinitiative/terraform-cloudflare-infra) | Private | Production DNS and Cloudflare Tunnel |
 | [`terraform-multicloud-runner`](https://github.com/freecloudinitiative/terraform-multicloud-runner) | Public | Self-hosted GitHub Actions runner infrastructure |
 
-!!! note "Private implementation repositories"
-    Private repositories appear here because they are part of the deployed architecture. Their links require organization access. Public users can still understand their contracts and runtime roles from this site.
+> [!NOTE]
+> **Private implementation repositories**
+>
+> Private repositories appear here because they are part of the deployed architecture. Their links require organization access. Public users can still understand their contracts and runtime roles from this site.
 
 ## Product experience
 

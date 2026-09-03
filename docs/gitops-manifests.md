@@ -143,7 +143,9 @@ The validation target lints YAML, lints and renders every Helm chart, schema-che
 make environment-check
 ~~~
 
-!!! warning "No manual drift as a deployment strategy"
-    A manual <code>kubectl</code> edit may be reverted by self-heal and is absent from the audit trail. Commit the desired state to the owning environment repository.
+> [!WARNING]
+> **No manual drift as a deployment strategy**
+>
+> A manual <code>kubectl</code> edit may be reverted by self-heal and is absent from the audit trail. Commit the desired state to the owning environment repository.
 
 [Trace the deployed control plane →](platform-services.md){ .md-button .md-button--primary }

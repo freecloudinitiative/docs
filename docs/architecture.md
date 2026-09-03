@@ -76,8 +76,10 @@ The boxes above represent ownership, not a single pipeline that runs on every ch
     - Uses reserved `.test` hostnames and a cluster-local CA so OIDC is exercised without public DNS.
     - Runs the frontend in production mode against the real backend rather than mock handlers.
 
-!!! warning "Environment isolation is a contract"
-    GitOps source URLs, OpenBao data, TLS roots, hostnames, and credentials are environment-specific. Do not reuse production secrets in non-production or point one cluster at the other environment's manifests.
+> [!WARNING]
+> **Environment isolation is a contract**
+>
+> GitOps source URLs, OpenBao data, TLS roots, hostnames, and credentials are environment-specific. Do not reuse production secrets in non-production or point one cluster at the other environment's manifests.
 
 ## Request and identity flow
 
@@ -147,8 +149,10 @@ The product APIs use a desired-state model. A successful create or update writes
 | Longhorn / local-path | Persistent volumes, selected by workload and environment policy. |
 | OpenBao + External Secrets | Secret source and Kubernetes Secret materialization. OpenBao is bootstrapped before Argo CD reconciliation begins. |
 
-!!! info "API acceptance is not runtime readiness"
-    Compute, database, and storage network mutations are asynchronous. The API records intent first; reconciliation status reports whether the corresponding Kubernetes resources are running or enforced.
+> [!NOTE]
+> **API acceptance is not runtime readiness**
+>
+> Compute, database, and storage network mutations are asynchronous. The API records intent first; reconciliation status reports whether the corresponding Kubernetes resources are running or enforced.
 
 ## GitOps and secret bootstrap
 
