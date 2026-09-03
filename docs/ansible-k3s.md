@@ -1,157 +1,127 @@
-# Cluster Setup with Ansible
+# Cluster bootstrap with Ansible
 
-<span class="step-badge">Step 2 of 4</span>
+<span class="step-badge">02 / BOOTSTRAP</span>
 
-The **`ansible-automation`** repository represents **Layers 2 and 3** of the platform. Once Terraform has provisioned your VMs, Ansible takes over: configuring the OS, bootstrapping a multi-master K3s cluster, and deploying core platform services.
+The [ansible-automation](https://github.com/freecloudinitiative/ansible-automation) repository turns reachable Linux nodes into an FCI K3s cluster and then hands steady-state ownership to Argo CD.
 
-!!! abstract "Repository"
-    **[`ansible-automation`](https://github.com/freecloudinitiative/ansible-automation)** — OS setup, K3s HA install, core operators
+## The bootstrap boundary
 
----
-
-## What Ansible Does
-
-```mermaid
+~~~mermaid
 flowchart TD
-    INV[inventory.ini\n from Terraform IPs] --> ANS[Ansible Playbook]
+    INV["validated inventory"] --> M["install K3s servers"]
+    M --> W["join K3s workers"]
+    W --> NODE["labels · taints · optional Kata/Tailscale"]
+    NODE --> B["install, initialize, unseal, seed OpenBao"]
+    B --> A["install Argo CD"]
+    A --> ROOT["apply selected GitOps root app"]
+    ROOT --> G["Argo CD owns steady state"]
+~~~
 
-    ANS --> OS[OS Configuration\nhostnames · cgroups · swap · SSH]
-    ANS --> K3S_M[K3s Primary Master\nControl plane init]
-    ANS --> K3S_HA[K3s HA Masters\njoin additional control planes]
-    ANS --> K3S_W[K3s Workers\njoin data plane]
+Ansible owns the steps that must exist before GitOps can function. It does not own normal application rollout, ingress, observability, or operator lifecycle after the handoff.
 
-    ANS --> TRF[Traefik Ingress]
-    ANS --> CM[Cert-Manager]
-    ANS --> SS[Sealed Secrets]
-    ANS --> ACD[ArgoCD]
-```
+## Production and non-production entry points
 
----
-
-## Directory Structure
-
-```text
+~~~text
 ansible-automation/
-├── inventory.ini               # Node IPs (from Terraform outputs)
-├── playbook.yml                # Master playbook — runs everything end-to-end
-├── ssh-config.yml              # Generates ~/.ssh/config + cleans stale host keys
-├── group_vars/
-│   └── all/
-│       ├── vars.yml            # Public variables (versions, settings)
-│       └── secret.yml          # Ansible Vault encrypted secrets
-└── roles/                      # 20+ modular Ansible roles
-    ├── k3s-pre-setup           # OS prerequisites: cgroups, swap disabled, kernel params
-    ├── k3s-master-setup        # Init K3s control plane, extract cluster join token
-    ├── k3s-ha-master-setup     # Join additional control-plane nodes (HA)
-    ├── k3s-worker-setup        # Join worker nodes to the cluster
-    ├── k3s-node-labeling       # Assign node roles/labels
-    ├── local-k9s-setup         # Fetch kubeconfig to local workstation
-    ├── traefik-setup           # Deploy Traefik Ingress via Helm
-    ├── cert-manager-setup      # Deploy Cert-Manager, ClusterIssuer
-    ├── sealed-secrets-setup    # Deploy Sealed Secrets controller
-    ├── argocd-setup            # Deploy ArgoCD operator
-    └── argocd-bootstrap        # Register k3s-manifests repo with ArgoCD
-```
+├── playbook.yml                 # production cluster
+├── nonprod-playbook.yml         # non-production cluster
+├── inventory.ini               # production nodes
+├── nonprod-inventory.ini       # non-production nodes
+├── prod-ssh-config.yml
+├── nonprod-ssh-config.yml
+├── reset-k3s.yml
+├── thermal-check.yml
+├── group_vars/all/
+└── roles/
+~~~
 
----
+The production playbook supports the bare-metal Raspberry Pi topology. The non-production playbook targets the separate cloud inventory and must override the GitOps repository and OpenBao values source to their non-production equivalents.
 
-## Step-by-Step Execution
+## Play order
 
-### 1. Populate the inventory
+1. Validate inventory and the first master's reachable join address.
+2. Prepare server nodes and initialize the first K3s server with <code>--cluster-init</code>.
+3. Join remaining servers and workers with the discovered node token.
+4. Apply node-tier labels and control-plane taints.
+5. Install optional host features:
+   - Kata Containers on <code>high_memory</code> workers with <code>/dev/kvm</code>;
+   - Tailscale when an auth key is supplied;
+   - Raspberry Pi boot configuration and operational tooling where applicable.
+6. Install OpenBao on the first master, initialize/unseal it, configure Kubernetes auth, and seed platform secrets.
+7. Install Argo CD and apply the root application for the selected GitOps repository.
+8. Seed the few CA-dependent OpenBao values after cert-manager has reconciled.
+9. Fetch kubeconfig and configure local k9s.
 
-Copy node IPs from Terraform outputs into `inventory.ini`:
+> [!NOTE]
+> **Why OpenBao is bootstrap-owned**
+>
+> External Secrets cannot materialize application secrets until its OpenBao <code>ClusterSecretStore</code> can authenticate. Preparing OpenBao before the first Argo CD sync removes that startup race. GitOps stores the reviewed Helm values, while Ansible performs the install and initialization.
 
-```ini
-[masters]
-master-1 ansible_host=34.72.134.198 ansible_user=ubuntu
-master-2 ansible_host=34.72.135.100 ansible_user=ubuntu
-master-3 ansible_host=34.72.136.200 ansible_user=ubuntu
+## K3s ownership choices
 
-[workers]
-worker-1 ansible_host=34.72.137.50 ansible_user=ubuntu
-worker-2 ansible_host=34.72.137.51 ansible_user=ubuntu
-```
+K3s starts with its packaged Traefik and ServiceLB disabled. The environment GitOps repository installs the selected ingress/load-balancer topology instead:
 
-### 2. Configure your local SSH
+- production uses Traefik plus MetalLB and Cloudflare Tunnel;
+- non-production uses Traefik host ports, with no MetalLB or Cloudflare.
 
-This playbook generates `~/.ssh/config` entries for each node and removes stale `known_hosts` entries (common after cluster recreation):
+This keeps environment differences in declarative desired state rather than hidden in node installation flags.
 
-```bash
-ansible-playbook ssh-config.yml
-```
+## Inventory contract
 
-### 3. Run the full bootstrap playbook
+The first server address is required before any node is modified:
 
-```bash
+~~~yaml
+k3s_master1_public_ip: "203.0.113.10"
+~~~
+
+Despite the historical variable name, non-production workers must join over the server's private VPC address. Public addresses are for operator SSH only.
+
+At least one non-production worker must be in the <code>high_memory</code> group because Authentik and Argo CD select that node tier. Other workers should be grouped according to the memory tiers expected by the GitOps scheduling rules.
+
+## Secrets
+
+<code>group_vars/all/secret.yml</code> is an Ansible Vault-encrypted file. Bootstrap values can also come from environment variables. The playbook validates lengths and PEM formats before writing to OpenBao, including distinct Ed25519 keypairs for:
+
+- api-gateway;
+- terminal-gateway;
+- compute-service;
+- database-service;
+- storage-service.
+
+These keys establish separate internal service identities. Reusing a key creates a key-ID collision and causes IAM startup validation to fail.
+
+Activate the repository's staged-content guard after cloning:
+
+~~~bash
+git config core.hooksPath hooks
+~~~
+
+> [!CAUTION]
+> **Never commit plaintext bootstrap material**
+>
+> Keep <code>secret.yml</code> encrypted, revoke the OpenBao bootstrap token after seeding, and never reuse production OpenBao data or credentials in non-production.
+
+## Run and verify
+
+~~~bash
 ansible-playbook playbook.yml --ask-vault-pass
-```
-
-!!! info "What `--ask-vault-pass` does"
-    Ansible Vault encrypts sensitive variables in `secret.yml` (passwords, tokens, private keys). The `--ask-vault-pass` flag prompts you for the decryption password at runtime.
-
-### 4. Verify cluster health
-
-After the playbook completes, your kubeconfig is fetched locally:
-
-```bash
 kubectl get nodes -o wide
-```
+kubectl -n argocd get applications.argoproj.io
+kubectl get pods -A
+~~~
 
-Expected output:
+For non-production, use <code>nonprod-playbook.yml</code> with the non-production inventory and repository overrides. After Argo CD installs Garage, run the environment GitOps repository's idempotent <code>scripts/garage-bootstrap.sh</code> before expecting storage-service readiness.
 
-```
-NAME       STATUS   ROLES                  AGE   VERSION
-master-1   Ready    control-plane,master   5m    v1.31.0+k3s1
-master-2   Ready    control-plane,master   4m    v1.31.0+k3s1
-master-3   Ready    control-plane,master   4m    v1.31.0+k3s1
-worker-1   Ready    worker                 3m    v1.31.0+k3s1
-```
+## Reset semantics
 
----
+<code>reset-k3s.yml</code> removes K3s agents first and then server/cluster data. It does not reinstall the cluster and requires explicit confirmation:
 
-## Secret Management with Ansible Vault
+~~~bash
+ansible-playbook reset-k3s.yml \
+  -e confirm_k3s_reset=true \
+  --ask-vault-pass
+~~~
 
-Sensitive values (admin passwords, tokens, API keys) are stored encrypted in `group_vars/all/secret.yml`:
+Run the appropriate bootstrap playbook separately afterward.
 
-=== "Encrypt a file"
-
-    ```bash
-    ansible-vault encrypt group_vars/all/secret.yml
-    ```
-
-=== "Edit encrypted secrets"
-
-    ```bash
-    ansible-vault edit group_vars/all/secret.yml
-    ```
-
-=== "Decrypt temporarily"
-
-    ```bash
-    ansible-vault decrypt group_vars/all/secret.yml
-    # ⚠️ Re-encrypt immediately after editing!
-    ansible-vault encrypt group_vars/all/secret.yml
-    ```
-
-!!! danger "Never commit unencrypted secrets"
-    `secret.yml` should always be encrypted before committing. Add a pre-commit hook or use `git-secrets` to enforce this.
-
----
-
-## What's deployed after this step
-
-| Component | Purpose |
-| :--- | :--- |
-| **K3s** | Lightweight Kubernetes (multi-master HA) |
-| **Traefik** | Ingress controller — routes HTTP/HTTPS to services |
-| **Cert-Manager** | Automatic TLS certificates (Let's Encrypt) |
-| **Sealed Secrets** | Encrypted Kubernetes secrets stored safely in Git |
-| **ArgoCD** | GitOps engine — watches `k3s-manifests` repo |
-
----
-
-## Next Step
-
-Your cluster is running and ArgoCD is installed. Time to configure GitOps:
-
-[**→ Step 3: GitOps & ArgoCD**](gitops-manifests.md){ .md-button .md-button--primary }
+[Continue to GitOps environments →](gitops-manifests.md){ .md-button .md-button--primary }

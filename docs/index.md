@@ -1,90 +1,99 @@
 <div class="hero" markdown>
 
-# Free Cloud Initiative
+<span class="terminal-kicker">FCI://DOCS</span>
 
-**Learn DevOps end-to-end through a real, production-grade project.**  
-From spinning up cloud VMs with Terraform to shipping apps via GitOps — follow every step, understand every decision.
+# [ FREE CLOUD INITIATIVE ]
+
+**A self-hosted cloud control plane, built in public.**<br>
+Explore the infrastructure, GitOps environments, Go services, and terminal-style web console that turn a K3s cluster into a small cloud platform.
 
 <div class="hero-buttons" markdown>
-<a href="learning-path/" class="btn-primary">Start Learning →</a>
-<a href="https://github.com/freecloudinitiative" class="btn-outline" target="_blank">View on GitHub</a>
+<a href="architecture/" class="btn-primary">[ EXPLORE ARCHITECTURE ]</a>
+<a href="repositories/" class="btn-outline">[ BROWSE 16 REPOSITORIES ]</a>
+</div>
+
+<div class="terminal-status" markdown>
+<span><b>PLATFORM</b> self-hosted</span>
+<span><b>CONTROL_PLANE</b> Go + React</span>
+<span><b>ORCHESTRATOR</b> K3s + Argo CD</span>
 </div>
 
 </div>
 
----
-
-## What is the Free Cloud Initiative?
-
-The **Free Cloud Initiative** is an open-source, end-to-end DevOps platform **and** a portfolio teaching project. It is designed for engineers who want to:
-
-- 🎓 **Learn real DevOps** — not toy examples, but production patterns
-- 🏗️ **See the full stack** — from raw cloud VMs to deployed microservices
-- 💼 **Build a portfolio** — every repo, every commit, is your proof of work
-
-The project walks through four layers of a modern DevOps pipeline, each layer a real GitHub repository you can fork, clone, and run yourself.
-
----
-
-## The 4-Layer DevOps Journey
+## What the platform provides
 
 <div class="feature-grid" markdown>
 
 <div class="feature-card" markdown>
-<div class="card-icon">🌩️</div>
-<span class="step-badge">Step 1</span>
+<span class="card-index">01 / COMPUTE</span>
 
-### Terraform
-Provision cloud VMs, VPCs, and firewall rules across **GCP, Azure, and AWS** using infrastructure-as-code. Learn multi-cloud provisioning and Cloudflare DNS automation.
+### Compute engines
 
-[→ Terraform Docs](terraform.md)
+Container-backed Linux environments with persistent disks, lifecycle controls, metrics, terminal access, quotas, and scheduled crash-consistent backups.
 </div>
 
 <div class="feature-card" markdown>
-<div class="card-icon">⚙️</div>
-<span class="step-badge">Step 2</span>
+<span class="card-index">02 / DATABASE</span>
 
-### Ansible + K3s
-Automate OS configuration and bootstrap a **multi-master HA K3s cluster** using Ansible playbooks and roles. Zero manual SSH commands.
+### Managed PostgreSQL
 
-[→ Ansible & K3s Docs](ansible-k3s.md)
+CloudNativePG clusters reconciled from API state, with live credentials, SQL execution, data import, connection limits, metrics, and backup configuration.
 </div>
 
 <div class="feature-card" markdown>
-<div class="card-icon">🔁</div>
-<span class="step-badge">Step 3</span>
+<span class="card-index">03 / STORAGE</span>
 
-### GitOps & ArgoCD
-Deploy every application declaratively using **ArgoCD App-of-Apps pattern**. Git is the single source of truth — push a commit, see it live.
+### Buckets and networks
 
-[→ GitOps Docs](gitops-manifests.md)
+S3-compatible object storage on Garage plus account-scoped virtual networks and firewall rules projected into Kubernetes NetworkPolicies.
 </div>
 
 <div class="feature-card" markdown>
-<div class="card-icon">📊</div>
-<span class="step-badge">Step 4</span>
+<span class="card-index">04 / ACCESS</span>
 
-### Observability
-Full metrics, logs, and traces with **Prometheus, Grafana, Loki, Tempo, and Alloy**. Because you can't run what you can't see.
+### Identity and terminals
 
-[→ Architecture Overview](architecture.md)
+Authentik OIDC, API keys, roles, quotas, audit records, and short-lived single-use tickets for browser-to-pod terminal sessions.
 </div>
 
 </div>
 
----
+## One system, six concerns
 
-## Repository Map
+```mermaid
+flowchart LR
+    I["01  INFRA\nTerraform"] --> B["02  BOOTSTRAP\nAnsible"]
+    B --> G["03  DELIVERY\nArgo CD"]
+    G --> P["04  PLATFORM\nK3s services"]
+    P --> C["05  CONTROL PLANE\nGo APIs + React"]
+    C --> O["06  OPERATIONS\nMetrics · logs · traces"]
+```
 
-| Repository | Layer | What You'll Learn |
-| :--- | :---: | :--- |
-| [`terraform-multicloud-infra`](https://github.com/freecloudinitiative/terraform-multicloud-infra) | 1 | Cloud VMs, networking, firewall rules (GCP/Azure/AWS) |
-| [`terraform-cloudflare-infra`](https://github.com/freecloudinitiative/terraform-cloudflare-infra) | 1 | DNS, TLS, Cloudflare Zero Trust Tunnels |
-| [`ansible-automation`](https://github.com/freecloudinitiative/ansible-automation) | 2–3 | OS config, K3s multi-master install, core operator deployment |
-| [`k3s-manifests`](https://github.com/freecloudinitiative/k3s-manifests) | 4 | Kubernetes manifests, Helm releases, GitOps App-of-Apps |
-| [`docs`](https://github.com/freecloudinitiative/docs) | — | This documentation site |
+The repositories are deliberately separated by lifecycle and trust boundary. Terraform creates machines and edge resources. Ansible turns nodes into a cluster and establishes the secret/GitOps bootstrap. Argo CD owns steady-state Kubernetes resources. The control plane exposes cloud-like products to users without giving them direct Kubernetes access.
 
----
+<div class="callout-grid" markdown>
 
-!!! tip "Portfolio Note"
-    Every decision in this project is intentional and explained. Whether you're preparing for a DevOps interview or want to understand how production Kubernetes infrastructure is built — this project has you covered.
+<div class="terminal-panel" markdown>
+<span class="panel-label">[ START_HERE ]</span>
+
+New to the project? Follow the [build path](learning-path.md) from infrastructure to a working platform.
+</div>
+
+<div class="terminal-panel" markdown>
+<span class="panel-label">[ SYSTEM_MAP ]</span>
+
+Need the runtime picture? Open the [architecture overview](architecture.md) and [control-plane guide](platform-services.md).
+</div>
+
+<div class="terminal-panel" markdown>
+<span class="panel-label">[ SOURCE_INDEX ]</span>
+
+Looking for ownership? The [repository catalog](repositories.md) covers every organization repository and its handoffs.
+</div>
+
+</div>
+
+> [!NOTE]
+> **An evolving reference platform**
+>
+> Free Cloud Initiative applies production-oriented patterns on small, self-hosted infrastructure. Repository documentation is the source of truth for implementation details and operational constraints; this site explains how those pieces fit together.

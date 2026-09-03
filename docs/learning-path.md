@@ -1,135 +1,94 @@
-# Learning Path
+# Build path
 
-Welcome to the **Free Cloud Initiative Learning Path** — a step-by-step guide through building a production-grade DevOps platform from scratch.
-
-!!! info "Who this is for"
-    This path is for engineers who want to learn the **full DevOps stack** — not just one tool in isolation, but how everything connects: cloud infra → cluster setup → GitOps → observability.
-
----
-
-## How the Path Works
-
-Each step builds on the previous one. You can follow along by cloning the real repositories and running the actual commands — this is a working project, not a tutorial with placeholder code.
+<span class="page-lede">Follow the same ownership boundaries the platform uses: provision infrastructure, bootstrap the cluster, hand it to GitOps, then trace a product request through the control plane.</span>
 
 ```mermaid
 flowchart LR
-    A["☁️ Step 1\nTerraform\n(Infra)"] --> B["⚙️ Step 2\nAnsible + K3s\n(Cluster)"]
-    B --> C["🔁 Step 3\nArgoCD GitOps\n(Delivery)"]
-    C --> D["📊 Step 4\nObservability\n(Prometheus + Grafana)"]
-
-    style A fill:#009485,color:#fff,stroke:#009485
-    style B fill:#009485,color:#fff,stroke:#009485
-    style C fill:#009485,color:#fff,stroke:#009485
-    style D fill:#009485,color:#fff,stroke:#009485
+    A["01\nPROVISION"] --> B["02\nBOOTSTRAP"]
+    B --> C["03\nRECONCILE"]
+    C --> D["04\nSERVE"]
+    D --> E["05\nOBSERVE"]
 ```
 
----
+## 01 / Provision
 
-## Step 1 — Infrastructure with Terraform
+**Repositories:** `terraform-multicloud-infra`, `terraform-cloudflare-infra`, and `terraform-multicloud-runner`
 
-**Repository:** `terraform-multicloud-infra` + `terraform-cloudflare-infra`
+Learn how FCI separates three infrastructure lifecycles:
 
-You start here: no cluster exists yet. You have only a cloud account and a domain name.
+- cluster nodes and networks across AWS, Azure, GCP, Civo, and Linode;
+- the always-on production DNS and Cloudflare tunnel configuration;
+- optional self-hosted GitHub Actions runner capacity.
 
-=== "What you'll do"
+The key output is not Kubernetes. It is a set of reachable nodes, a defined network boundary, and—in production—an edge route that the later cluster can consume.
 
-    - [ ] Choose a cloud provider: GCP, Azure, or AWS
-    - [ ] Provision master and worker VMs using Terraform
-    - [ ] Configure firewall rules to allow SSH from your IP
-    - [ ] Set up Cloudflare DNS records for your domain
-    - [ ] Export node IPs for use in the next step
+[Open the Terraform guide →](terraform.md){ .md-button .md-button--primary }
 
-=== "What you'll learn"
-
-    - Infrastructure-as-Code (IaC) fundamentals
-    - Terraform project structure (modules, variables, outputs, state backends)
-    - Multi-cloud provisioning patterns
-    - Cloudflare DNS automation and Zero Trust Tunnels
-    - How to manage secrets safely in Terraform (Vault, env vars, tfvars)
-
-[**→ Go to Step 1: Terraform**](terraform.md){ .md-button .md-button--primary }
-
----
-
-## Step 2 — Cluster Setup with Ansible
+## 02 / Bootstrap
 
 **Repository:** `ansible-automation`
 
-You have your VMs. Now you need to configure them and install a Kubernetes cluster — automatically, repeatably, with no manual steps.
+Move from machines to a usable K3s cluster. The playbooks validate inventory, configure masters and workers, apply node tiers and taints, optionally install Kata/Tailscale, bootstrap OpenBao, install Argo CD, and apply the selected environment root application.
 
-=== "What you'll do"
+Pay particular attention to the ownership cutover: Ansible owns the one-time prerequisites that GitOps needs in order to function; it does not remain the steady-state application deployer.
 
-    - [ ] Generate `inventory.ini` from Terraform outputs
-    - [ ] Run SSH config generation playbook
-    - [ ] Bootstrap K3s multi-master control plane
-    - [ ] Join worker nodes
-    - [ ] Deploy core cluster services (Traefik, Cert-Manager, Sealed Secrets)
-    - [ ] Deploy ArgoCD for GitOps
+[Open the Ansible and K3s guide →](ansible-k3s.md){ .md-button .md-button--primary }
 
-=== "What you'll learn"
+## 03 / Reconcile
 
-    - Ansible playbook and role structure
-    - Idempotent infrastructure automation
-    - K3s Kubernetes multi-master HA setup
-    - Helm chart deployment via Ansible
-    - Ansible Vault for secret management
+**Repositories:** `k3s-manifests` and `nonprod-k3s-manifests`
 
-[**→ Go to Step 2: Ansible & K3s**](ansible-k3s.md){ .md-button .md-button--primary }
+Study two environment repositories with a shared platform shape and different edge contracts. Argo CD applies operators and data services first, then the FCI applications, and continuously repairs drift.
 
----
+This stage covers:
 
-## Step 3 — GitOps with ArgoCD
+- app-of-apps discovery and sync waves;
+- OpenBao and External Secrets handoff;
+- TLS, ingress, policy, storage, database, and observability operators;
+- production versus non-production isolation;
+- immutable application image promotion.
 
-**Repository:** `k3s-manifests`
+[Open the GitOps guide →](gitops-manifests.md){ .md-button .md-button--primary }
 
-Your cluster is running. Now you deploy and manage all applications declaratively — Git is the only source of truth.
+## 04 / Serve
 
-=== "What you'll do"
+**Repositories:** `frontend`, `api-gateway`, `iam-service`, `compute-service`, `database-service`, `storage-service`, `terminal-gateway`, and `platform-common`
 
-    - [ ] Register `k3s-manifests` repo with ArgoCD
-    - [ ] Apply the root `bootstrap/root-app.yaml`
-    - [ ] Watch ArgoCD sync all infrastructure and applications
-    - [ ] Deploy a new application by creating a Helm values file and committing it
-    - [ ] Observe automatic reconciliation when you drift from desired state
+Trace one authenticated action from the React console through the gateway to a domain service. Then follow the desired-state write into a reconcile queue and into Kubernetes, CloudNativePG, or Garage.
 
-=== "What you'll learn"
+Focus on the boundaries:
 
-    - GitOps principles and the ArgoCD App-of-Apps pattern
-    - Declarative Kubernetes manifests vs Helm releases
-    - Continuous delivery without CI/CD pipelines
-    - Sealed Secrets for encrypted secrets in Git
-    - Traefik Ingress routing and path-based access
+- Authentik authenticates; IAM owns platform identity and authorization data.
+- The gateway exchanges external credentials for audience-bound internal JWTs.
+- Each service owns its database schema and resource rules.
+- `platform-common` owns cross-cutting mechanics.
+- Background reconciliation separates API availability from infrastructure convergence.
 
-[**→ Go to Step 3: GitOps & ArgoCD**](gitops-manifests.md){ .md-button .md-button--primary }
+[Open the control-plane guide →](platform-services.md){ .md-button .md-button--primary }
 
----
+## 05 / Observe and operate
 
-## Step 4 — Observability
+**Repositories:** GitOps environment, service, and `.github` repositories
 
-**Part of:** `k3s-manifests/infrastructure/`
+Connect service RED/domain metrics, structured logs, traces, readiness checks, and worker queue health to the deployed Prometheus, Grafana, Loki, Tempo, OpenTelemetry, and Alloy stack. Then inspect the shared CI workflows that verify source and build ARM64 images.
 
-You can't run what you can't see. The observability stack gives you full visibility into your cluster.
+Useful questions to answer:
 
-=== "Stack"
+1. Which repository owns the desired state you want to change?
+2. Which process turns that state into a runtime object?
+3. Where is failure recorded: API response, reconcile status, readiness, metric, or audit log?
+4. Is the behavior shared across environments or intentionally different?
 
-    | Tool | Purpose |
-    | :--- | :--- |
-    | **Prometheus** | Metrics collection and alerting |
-    | **Grafana** | Dashboards and visualization |
-    | **Loki** | Log aggregation |
-    | **Tempo** | Distributed tracing |
-    | **Grafana Alloy** | OpenTelemetry collector (replaces Promtail/Agent) |
+## Suggested reading order
 
-=== "What you'll learn"
+1. [System architecture](architecture.md)
+2. [Repository catalog](repositories.md)
+3. [Infrastructure with Terraform](terraform.md)
+4. [Cluster bootstrap with Ansible](ansible-k3s.md)
+5. [GitOps environments](gitops-manifests.md)
+6. [Control-plane services](platform-services.md)
 
-    - The Grafana LGTM stack (Loki, Grafana, Tempo, Metrics)
-    - Kube-Prometheus-Stack Helm chart customization
-    - OpenTelemetry pipeline configuration
-    - Kubernetes metrics and log collection patterns
-
-[**→ Architecture Overview**](architecture.md){ .md-button .md-button--primary }
-
----
-
-!!! success "You did it!"
-    By the end of this path, you'll have a fully operational, production-style Kubernetes platform running on real cloud VMs — and the knowledge to explain every component in a technical interview.
+> [!TIP]
+> **You understand the platform when…**
+>
+> You can route a change to its owning repository, explain the bootstrap-to-GitOps cutover, trace a browser request to runtime state, and identify which environment-specific repository will deploy it.

@@ -1,171 +1,151 @@
-# GitOps with ArgoCD
+# GitOps environments
 
-<span class="step-badge">Step 3 of 4</span>
+<span class="step-badge">03 / RECONCILE</span>
 
-The **`k3s-manifests`** repository is **Layer 4** of the platform — the single source of truth for every application and infrastructure component running inside the K3s cluster.
+FCI has one Argo CD source-of-truth repository per environment:
 
-!!! abstract "Repository"
-    **[`k3s-manifests`](https://github.com/freecloudinitiative/k3s-manifests)** — Declarative Kubernetes manifests, Helm releases, App-of-Apps pattern
+- [k3s-manifests](https://github.com/freecloudinitiative/k3s-manifests) for production on bare metal;
+- [nonprod-k3s-manifests](https://github.com/freecloudinitiative/nonprod-k3s-manifests) for the isolated AWS test cluster.
 
----
+Both repositories deploy the real control plane. Their differences encode environment contracts, not separate product implementations.
 
-## The GitOps Principle
+## Argo CD handoff
 
-Instead of running `kubectl apply` manually, every change goes through Git:
-
-```mermaid
+~~~mermaid
 sequenceDiagram
-    autonumber
-    actor Dev as You (Developer)
-    participant Git as k3s-manifests (GitHub)
-    participant ACD as ArgoCD (in K3s)
-    participant K3S as K3s Cluster
+    participant A as ansible-automation
+    participant O as OpenBao
+    participant C as Argo CD
+    participant G as environment GitOps repo
+    participant K as K3s
 
-    Dev->>Git: git push (add app / change config)
-    ACD->>Git: Detects new commit (poll every 3 min or webhook)
-    ACD->>K3S: Applies diff (reconciles desired vs actual state)
-    K3S-->>ACD: Reports Healthy / Synced status
-    ACD-->>Dev: ✅ Visible in ArgoCD UI
-```
+    A->>O: install, initialize, unseal, seed
+    A->>C: install Argo CD
+    A->>K: apply root Application
+    C->>G: discover infrastructure/* and applications/*
+    C->>K: sync in wave order
+    loop steady state
+        C->>G: detect commits
+        C->>K: apply, prune, self-heal
+    end
+~~~
 
-!!! tip "Why GitOps?"
-    Git provides **audit trail, rollback, peer review, and access control** for free. Every change to your cluster is a Git commit — you can `git revert` a bad deployment instantly.
+The root application is the one imperative apply. After that handoff, changes belong in Git. Argo CD uses automated sync, pruning, and self-healing to keep the cluster aligned.
 
----
+## Shared layout
 
-## Repository Structure
-
-The repo uses the **App-of-Apps** pattern: one root ArgoCD Application watches the repo and creates child Applications for every service.
-
-```text
-k3s-manifests/
-├── bootstrap/
-│   └── root-app.yaml               # 🌱 The single kubectl apply that starts everything
+~~~text
+<environment>-k3s-manifests/
 ├── infrastructure/
-│   ├── traefik/                    # Ingress controller config & middlewares
-│   ├── cert-manager/               # ClusterIssuer & TLS certificates
-│   ├── sealed-secrets/             # Secret encryption controller
-│   ├── kube-prometheus-stack/      # Prometheus + Grafana + Alertmanager
-│   ├── loki/                       # Log aggregation
-│   ├── tempo/                      # Distributed tracing
-│   └── alloy/                      # Grafana Alloy (OTel collector)
+│   ├── namespaces/
+│   ├── coredns/
+│   ├── cert-manager/
+│   ├── longhorn/
+│   ├── traefik/
+│   ├── external-secrets/
+│   ├── cloudnative-pg/
+│   ├── kyverno/
+│   ├── kyverno-policies/
+│   ├── platform-postgresql/
+│   ├── valkey/
+│   ├── garage/
+│   ├── authentik/
+│   ├── argocd/
+│   ├── kube-prometheus-stack/
+│   ├── loki/
+│   ├── tempo/
+│   ├── opentelemetry/
+│   └── alloy/
 └── applications/
-    ├── gitea/                      # Self-hosted Git platform
-    ├── log-generator/              # Demo app producing structured logs
-    └── sample-app/                 # Frontend + backend demo microservices
-```
+    ├── frontend/
+    ├── api-gateway/
+    ├── iam-service/
+    ├── compute-service/
+    ├── database-service/
+    ├── storage-service/
+    └── terminal-gateway/
+~~~
 
----
+Each application directory contains its Argo CD <code>app.yaml</code> and its colocated Helm chart. There is no separate charts tree.
 
-## Getting Started
+Production additionally owns <code>metallb</code> and <code>cloudflared</code>. OpenBao has reviewed values under <code>infrastructure/openbao</code>, but no Argo CD Application because its lifecycle is bootstrap-owned.
 
-### 1. Connect the repository to ArgoCD
+## Environment differences
 
-After Ansible deploys ArgoCD (Step 2), register your `k3s-manifests` repo:
+| Concern | Production | Non-production |
+| --- | --- | --- |
+| Nodes | Bare-metal Raspberry Pi fleet | AWS: one server and four workers |
+| Git source | <code>k3s-manifests</code> | <code>nonprod-k3s-manifests</code> |
+| Public edge | Cloudflare Tunnel | None |
+| Load balancer | MetalLB L2 | None |
+| Traefik | Cluster ingress behind MetalLB/tunnel | Host ports 80/443 on control-plane |
+| Names | Public FCI domain | Reserved <code>.test</code> names via hosts file/CoreDNS |
+| Browser TLS | Public/private issuers by endpoint | Environment-local private CA |
+| Frontend mode | Production backend | Production backend (not MSW mocks) |
+| Secrets | Production OpenBao | Separate non-production OpenBao |
 
-```bash
-argocd repo add https://github.com/freecloudinitiative/k3s-manifests \
-  --username <github-user> \
-  --password <github-pat>
-```
+The non-production repository's <code>make environment-check</code> rejects production Git URLs, Cloudflare/MetalLB resources, ACME issuers, and Kubernetes LoadBalancer Services.
 
-### 2. Apply the root application
+## Infrastructure dependency chain
 
-This single command bootstraps the entire cluster from Git:
+~~~mermaid
+flowchart LR
+    NS["namespaces"] --> CERT["cert-manager"]
+    CERT --> ESO["External Secrets"]
+    O["OpenBao\nAnsible-owned"] --> ESO
+    ESO --> DATA["Postgres · Valkey · Garage · Authentik"]
+    DATA --> API["FCI backend services"]
+    API --> UI["frontend"]
+    OBS["Prometheus · Loki · Tempo\nOTel · Alloy"] --> API
+~~~
 
-```bash
-kubectl apply -f bootstrap/root-app.yaml
-```
+Argo CD sync waves and readiness protect this ordering, but two external bootstrap contracts remain:
 
-!!! success "That's it!"
-    ArgoCD will discover all child applications defined in `infrastructure/` and `applications/` and sync them automatically. Watch the ArgoCD UI to see everything come up.
+1. OpenBao must be initialized and seeded before External Secrets can succeed.
+2. Garage's layout, physical <code>platform</code> bucket, and service key must be created with <code>scripts/garage-bootstrap.sh</code> after its pods are ready.
 
-### 3. Deploy a new application
+Until Garage bootstrap completes, storage-service intentionally remains NotReady because its object-store readiness check performs <code>HeadBucket</code>.
 
-To deploy a new service:
+## Application promotion
 
-=== "Helm Release"
+FCI service charts require an explicit image tag or digest. Argo CD Application parameters pin the promoted version; charts do not silently fall back to an app version that may not exist.
 
-    Create `applications/my-app/values.yaml`:
-    ```yaml
-    replicaCount: 2
-    image:
-      repository: my-registry/my-app
-      tag: "1.0.0"
-    service:
-      port: 8080
-    ingress:
-      enabled: true
-      host: my-app.freecloudinitiative.com
-    ```
+~~~yaml
+spec:
+  source:
+    helm:
+      parameters:
+        - name: image.tag
+          value: sha-abc123def456
+~~~
 
-=== "Raw Manifests"
+Application images live in <code>ghcr.io/freecloudinitiative</code>, and External Secrets materializes pull credentials into the backend and frontend namespaces.
 
-    Create `applications/my-app/deployment.yaml`:
-    ```yaml
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: my-app
-    spec:
-      replicas: 2
-      selector:
-        matchLabels:
-          app: my-app
-      template:
-        metadata:
-          labels:
-            app: my-app
-        spec:
-          containers:
-            - name: my-app
-              image: my-registry/my-app:1.0.0
-    ```
+## Adding or changing an application
 
-Then commit and push — ArgoCD auto-syncs within 3 minutes (or instantly via webhook).
+1. Change the service source repository and publish an immutable ARM64 image.
+2. Update the image tag/digest in the intended environment repository.
+3. Modify its colocated Helm chart if runtime configuration or Kubernetes resources changed.
+4. Run the repository validation suite.
+5. Merge; Argo CD detects the commit and converges the cluster.
 
----
+Create a new service under <code>applications/&lt;service&gt;</code> with both a chart and an Argo CD Application manifest. If it needs a namespace, declare it under <code>infrastructure/namespaces</code> or use the operator's documented namespace creation contract.
 
-## Traefik Ingress Routing
+## Validate locally
 
-All services are exposed via Traefik with path-based routing on a single IP:
+~~~bash
+make validate
+~~~
 
-| Path | Service |
-| :--- | :--- |
-| `/argocd` | ArgoCD UI |
-| `/grafana` | Grafana dashboards |
-| `/gitea` | Gitea self-hosted Git |
-| `/` | Sample application frontend |
+The validation target lints YAML, lints and renders every Helm chart, schema-checks rendered resources with kubeconform, and runs helm-unittest suites. In non-production, also run:
 
-!!! note "No NodePorts needed"
-    Traefik handles all routing on ports 80 and 443. You do **not** need to open individual NodePort firewall rules for each service.
+~~~bash
+make environment-check
+~~~
 
----
+> [!WARNING]
+> **No manual drift as a deployment strategy**
+>
+> A manual <code>kubectl</code> edit may be reverted by self-heal and is absent from the audit trail. Commit the desired state to the owning environment repository.
 
-## Secret Management with Sealed Secrets
-
-Git-committed secrets are encrypted with the cluster's public key:
-
-```bash
-# Create a regular Kubernetes secret
-kubectl create secret generic my-secret \
-  --from-literal=password=supersecret \
-  --dry-run=client -o yaml > secret.yaml
-
-# Seal it (only decryptable by your specific cluster)
-kubeseal --format yaml < secret.yaml > sealed-secret.yaml
-
-# Commit the sealed secret to Git — it's safe!
-git add sealed-secret.yaml && git commit -m "add sealed secret"
-```
-
-!!! warning "Cluster-specific encryption"
-    Sealed Secrets are encrypted with your cluster's key. If you destroy and recreate the cluster, you must re-seal all secrets (or back up the controller's private key).
-
----
-
-## Next Step
-
-Your applications are running. Now observe them:
-
-[**→ Architecture & Observability Overview**](architecture.md){ .md-button .md-button--primary }
+[Trace the deployed control plane →](platform-services.md){ .md-button .md-button--primary }

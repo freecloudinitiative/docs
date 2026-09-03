@@ -1,145 +1,111 @@
 # Infrastructure with Terraform
 
-<span class="step-badge">Step 1 of 4</span>
+<span class="step-badge">01 / PROVISION</span>
 
-Terraform forms **Layer 1** of the Free Cloud Initiative platform. Before any Kubernetes cluster exists, Terraform provisions the cloud compute instances, configures network rules, and wires up DNS routing via Cloudflare.
+FCI keeps cluster infrastructure, production edge configuration, and CI runner capacity in separate Terraform repositories so they can be created, changed, and destroyed independently.
 
-!!! abstract "Repositories covered"
-    - **[`terraform-multicloud-infra`](https://github.com/freecloudinitiative/terraform-multicloud-infra)** — VMs, VPCs, firewall rules across GCP/Azure/AWS
-    - **[`terraform-cloudflare-infra`](https://github.com/freecloudinitiative/terraform-cloudflare-infra)** — DNS records, TLS certs, Zero Trust Tunnels
+## Repository split
 
----
+| Repository | Lifecycle | Scope |
+| --- | --- | --- |
+| **terraform-multicloud-infra** | On demand | Cluster nodes, networks, and firewall rules |
+| **terraform-cloudflare-infra** | Always on in production | DNS records and one Zero Trust tunnel configuration |
+| **terraform-multicloud-runner** | Independent CI capacity | Self-hosted GitHub Actions runner VMs |
 
-## Overview
-
-The platform splits infrastructure into two dedicated Terraform repositories to separate concerns cleanly:
-
-```mermaid
+~~~mermaid
 flowchart LR
-    subgraph "Repo 1: terraform-multicloud-infra"
-        TF1[Terraform] --> GCP[GCP VMs]
-        TF1 --> AZ[Azure VMs]
-        TF1 --> AWS[AWS EC2]
-    end
-    subgraph "Repo 2: terraform-cloudflare-infra"
-        TF2[Terraform] --> CF_DNS[Cloudflare DNS]
-        TF2 --> CF_TUNNEL[Zero Trust Tunnels]
-    end
-    GCP & AZ & AWS --> K3S[K3s Cluster Nodes]
-    CF_DNS --> K3S
-```
+    TF["terraform-multicloud-infra"] --> N["cluster nodes + networks"]
+    N --> A["Ansible inventory"]
+    CF["terraform-cloudflare-infra"] --> E["Cloudflare edge"]
+    E --> T["in-cluster cloudflared → Traefik"]
+    R["terraform-multicloud-runner"] --> CI["self-hosted Actions runners"]
+    CI --> W["shared .github workflows"]
+~~~
 
----
+## Cluster infrastructure
 
-## Part 1 — Multi-Cloud VM Provisioning
+[terraform-multicloud-infra](https://github.com/freecloudinitiative/terraform-multicloud-infra) contains an independent root per provider:
 
-### Directory Structure
-
-```text
+~~~text
 terraform-multicloud-infra/
-├── gcp/        # GCP Compute Engine, VPC, Firewall
-├── azure/      # Azure VMs, Virtual Network, NSGs
-└── aws/        # AWS EC2, VPC, Security Groups
-```
+├── aws/
+├── azure/
+├── civo/
+├── gcp/
+└── linode/
+~~~
 
-### What gets provisioned
+Implemented resources vary by provider. GCP and AWS include the fullest node/network/firewall models; AWS also supports a secondary VPC with peering. Civo and Linode define provider-native instances and firewalls. The Azure root is earlier-stage and currently contains only part of the intended cluster resource set.
 
-- **Master nodes** (`master-1`, `master-2`, `master-3`) — Kubernetes control plane
-- **Worker nodes** — Kubernetes data plane for workload scheduling
-- **VPC / Subnet** — Isolated private network for cluster communication
-- **Firewall rules** — SSH restricted to admin IPs; cluster ports for inter-node comms
+> [!NOTE]
+> **Treat each provider root independently**
+>
+> Each directory has its own providers, variables, outputs, and backend expectations. Initialize, plan, and apply from the selected directory; do not assume provider roots have identical feature depth.
 
-!!! warning "Security: Lock down SSH"
-    Always restrict SSH access to your own public IP using `TF_VAR_gcp_admin_ip_ranges`. Never leave port 22 open to `0.0.0.0/0` in production.
+### Handoff to Ansible
 
-### Quick Start
+Terraform outputs supply the public/private addresses and node topology for the environment's Ansible inventory. K3s join traffic must use an address reachable by all nodes—private VPC addresses in non-production—while public addresses are reserved for operator access.
 
-=== "GCP"
-
-    ```bash
-    cd gcp
-
-    export TF_VAR_gcp_project_id="your-project-id"
-    export TF_VAR_gcp_admin_ip_ranges="[\"$(curl -s https://ipinfo.io/ip)/32\"]"
-
-    terraform init -backend-config="bucket=tf-state-$TF_VAR_gcp_project_id"
-    terraform plan
-    terraform apply
-    ```
-
-=== "Azure"
-
-    ```bash
-    cd azure
-
-    az login
-    export TF_VAR_admin_ip="$(curl -s https://ipinfo.io/ip)/32"
-
-    terraform init
-    terraform plan
-    terraform apply
-    ```
-
-=== "AWS"
-
-    ```bash
-    cd aws
-
-    export AWS_ACCESS_KEY_ID="your-key"
-    export AWS_SECRET_ACCESS_KEY="your-secret"
-    export TF_VAR_admin_ip="$(curl -s https://ipinfo.io/ip)/32"
-
-    terraform init
-    terraform plan
-    terraform apply
-    ```
-
-### Outputs you'll need
-
-After `terraform apply`, note these outputs — you'll paste them into Ansible's `inventory.ini` in Step 2:
-
-```hcl
-# Example Terraform outputs
-output "master_public_ips" {
-  value = [for vm in google_compute_instance.master : vm.network_interface[0].access_config[0].nat_ip]
-}
-
-output "worker_public_ips" {
-  value = [for vm in google_compute_instance.worker : vm.network_interface[0].access_config[0].nat_ip]
-}
-```
-
----
-
-## Part 2 — DNS & Edge Networking (Cloudflare)
-
-### What gets configured
-
-1. **DNS `A` Records** — Map subdomains (`argocd.freecloudinitiative.com`, `grafana.freecloudinitiative.com`) to your cluster's ingress IP
-2. **Cloudflare Zero Trust Tunnels** — Encrypted tunnels from Cloudflare edge to internal cluster services, **no public ports required**
-3. **TLS Certificates** — Managed automatically by Cloudflare + cert-manager
-
-!!! tip "Why Cloudflare Tunnels?"
-    Tunnels let you expose your cluster services over HTTPS without opening inbound firewall ports to the internet. The `cloudflared` daemon inside your cluster initiates outbound connections to Cloudflare's edge — far more secure than NodePort or LoadBalancer services.
-
-### Quick Start
-
-```bash
-cd terraform-cloudflare-infra
-
-export TF_VAR_cloudflare_api_token="your-token"
-export TF_VAR_account_id="your-cloudflare-account-id"
-export TF_VAR_zone_id="your-cloudflare-zone-id"
-
+~~~bash
+cd terraform-multicloud-infra/gcp
 terraform init
 terraform plan
 terraform apply
-```
+terraform output
+~~~
 
----
+Restrict SSH CIDRs before applying. Defaults that allow <code>0.0.0.0/0</code> are development conveniences, not a safe deployment policy.
 
-## Next Step
+## Production edge
 
-With VMs running and DNS configured, proceed to cluster setup:
+[terraform-cloudflare-infra](https://github.com/freecloudinitiative/terraform-cloudflare-infra) creates:
 
-[**→ Step 2: Ansible & K3s**](ansible-k3s.md){ .md-button .md-button--primary }
+1. the root and configured service DNS records;
+2. the <code>freecloud-k3s-tunnel</code> Cloudflare tunnel;
+3. hostname-to-origin ingress rules with a catch-all 404;
+4. the tunnel token consumed by the in-cluster <code>cloudflared</code> workload.
+
+It does **not** run <code>cloudflared</code> or terminate application HTTP. <code>k3s-manifests/infrastructure/cloudflared</code> runs the connector, and Traefik owns routing inside the cluster.
+
+Services marked <code>internal_only</code> are removed from tunnel ingress and receive an unproxied LAN address instead. Administrative endpoints should remain internal.
+
+~~~bash
+cd terraform-cloudflare-infra
+export CLOUDFLARE_API_TOKEN="..."
+export TF_VAR_account_id="..."
+export TF_VAR_zone_id="..."
+terraform init
+terraform plan
+~~~
+
+> [!WARNING]
+> **Production state**
+>
+> The committed backend is local, while production automation owns the live state. Do not apply production from a fresh laptop state: Terraform would not know which edge resources already exist.
+
+## CI runner infrastructure
+
+[terraform-multicloud-runner](https://github.com/freecloudinitiative/terraform-multicloud-runner) provisions organization runners separately from application infrastructure. GCP, Azure, and Civo roots include VM bootstrap scripts that register multiple GitHub Actions runners per VM and support simple/HA counts. AWS and Linode currently contain provider scaffolding, not complete runner deployments.
+
+This repository exists because many FCI builds target ARM64 and some workflows need access to project-local infrastructure. Runner capacity can change without touching the K3s cluster.
+
+> [!CAUTION]
+> **Runner registration credentials**
+>
+> GitHub registration tokens and PATs are sensitive Terraform inputs. Supply them through the workflow secret store or environment variables and keep state access tightly controlled.
+
+## Validation and workflow ownership
+
+Repository workflows call reusable jobs maintained in [.github](https://github.com/freecloudinitiative/.github). The shared Terraform checks format and validate every selected root; apply and destroy remain explicit workflows with provider credentials supplied as secrets.
+
+Before a pull request:
+
+~~~bash
+terraform fmt -check -recursive
+terraform init -backend=false
+terraform validate
+~~~
+
+Run <code>init</code> and <code>validate</code> in each root you changed.
+
+[Continue to cluster bootstrap →](ansible-k3s.md){ .md-button .md-button--primary }
