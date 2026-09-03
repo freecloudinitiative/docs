@@ -15,8 +15,8 @@ flowchart LR
     S["source + lock files"] --> B["builder stage\nBUILDPLATFORM"]
     B --> A["compiled artifact"]
     A --> R["minimal runtime\nlinux/arm64"]
-    R --> G["GHCR\nsha-<commit>"]
-    G --> K["GitOps image.tag"]
+    R --> G["GHCR\ntag + sha256 digest"]
+    G --> K["GitOps image.digest"]
 ```
 
 ### Go services
@@ -42,7 +42,7 @@ The frontend builds the Vite application with Node 22 Alpine and `npm ci`, then 
 
 ## Cross-platform builds
 
-FCI's cluster nodes are ARM64. `FROM --platform=$BUILDPLATFORM` lets the compiler stage run natively on the CI machine while the compiler produces an ARM64 artifact. The final image is published for `linux/arm64`. Buildx and QEMU make this possible on x86 runners, but native ARM64 runners reduce emulation cost.
+FCI's cluster nodes are ARM64. `FROM --platform=$BUILDPLATFORM` lets the compiler stage run natively on the CI machine, but it does not set Go's compilation target. The build must also set `GOOS=linux` and `GOARCH=arm64`, as the current service Dockerfiles do, or pass Buildx `TARGETOS` and `TARGETARCH` into those variables. The final image is then published for `linux/arm64`. Buildx and QEMU make this possible on x86 runners, but native ARM64 runners reduce emulation cost.
 
 Check the result instead of trusting the tag:
 
@@ -63,7 +63,7 @@ A container image is only one side of the contract. The colocated Helm chart sup
 
 ## Promotion model
 
-Application workflows publish to GHCR with immutable commit-derived tags such as `sha-abc123def456`. The environment repository then changes `image.tag` or `image.digest`. Production and non-production can promote the same bytes independently; a deployment never depends on mutable `latest` behavior.
+Application workflows publish to GHCR with commit-derived tags such as `sha-abc123def456`. A registry tag remains mutable even when its name contains a commit SHA, so the tag provides traceability but is not an immutable deployment reference. Immutable promotion must capture the build's `sha256:` digest and set `image.digest` in the environment repository; the Helm chart then renders `repository@sha256:...`. Production and non-production can promote that same digest independently. Deployments must never use the mutable `latest` tag.
 
 ## Practice
 

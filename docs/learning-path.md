@@ -10,7 +10,8 @@ flowchart LR
     B --> C["03\nPACKAGE"]
     C --> D["04\nORCHESTRATE"]
     D --> E["05\nRECONCILE"]
-    E --> F["06\nOPERATE"]
+    E --> F["06\nSERVE"]
+    F --> G["07\nOPERATE"]
 ```
 
 ## 01 / Provision
@@ -41,7 +42,7 @@ Pay particular attention to the ownership cutover: Ansible owns the one-time pre
 
 **Repositories:** all application and service repositories
 
-Learn how multi-stage Dockerfiles compile the React application and statically linked Go services, remove build tooling from runtime images, run as non-root users, and publish `linux/arm64` artifacts to GHCR. Then follow an immutable commit-derived tag into a GitOps release.
+Learn how multi-stage Dockerfiles compile the React application and statically linked Go services, remove build tooling from runtime images, run as non-root users, and publish `linux/arm64` artifacts to GHCR. Then follow an immutable image digest into a GitOps release.
 
 [Open the Docker and OCI guide →](learning/docker.md){ .md-button .md-button--primary }
 

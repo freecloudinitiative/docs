@@ -34,6 +34,8 @@ Non-production omits Cloudflare and MetalLB. Traefik binds host ports `80` and `
 
 Do not debug all four as one black box. Test from the outside inward, then from the pod outward.
 
+The commands below use `api.example.invalid` as a reserved placeholder. Replace it with the API hostname for the environment you are diagnosing.
+
 ```bash
 dig +short api.example.invalid
 kubectl -n traefik get svc,endpoints

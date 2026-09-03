@@ -1,6 +1,6 @@
 # CI/CD and software supply chain
 
-<span class="page-lede">Learn how repository-local workflows, organization-wide reusable jobs, immutable container tags, and GitOps promotion create an auditable delivery path.</span>
+<span class="page-lede">Learn how repository-local workflows, organization-wide reusable jobs, content-addressed image references, and GitOps promotion create an auditable delivery path.</span>
 
 ## Pipeline boundaries
 
@@ -8,8 +8,8 @@
 flowchart LR
     C["source commit"] --> V["lint + test + security checks"]
     V --> B["Buildx ARM64 image"]
-    B --> R["GHCR immutable tag"]
-    R --> P["environment GitOps PR"]
+    B --> R["GHCR image + digest"]
+    R --> P["GitOps PR\nimage.digest"]
     P --> A["Argo CD reconciliation"]
     A --> H["health + telemetry"]
 ```
@@ -29,9 +29,9 @@ The `.github` repository owns reusable workflow mechanics. Each repository retai
 
 ## Build once, promote by reference
 
-Application workflows publish `linux/arm64` images to GHCR using commit-derived tags such as `sha-abc123def456`. A separate commit updates the desired image in production or non-production. This separates artifact creation from deployment approval and lets operators answer exactly which source commit produced a running pod.
+Application workflows publish `linux/arm64` images to GHCR using commit-derived tags such as `sha-abc123def456`. Those tags identify source but remain mutable registry pointers. Immutable promotion captures the build's `sha256:` digest and updates `image.digest` in production or non-production, causing the chart to render `repository@sha256:...`. This separates artifact creation from deployment approval and fixes the running bytes to one content-addressed manifest.
 
-Image pull credentials are sourced from OpenBao and materialized by External Secrets. Helm charts require an explicit tag or digest; they should fail rendering rather than silently selecting `latest`.
+Image pull credentials are sourced from OpenBao and materialized by External Secrets. Helm charts require an explicit tag or digest; promotion should use the digest and must never deploy `latest`.
 
 ## Least-privilege workflows
 

@@ -82,7 +82,7 @@ At least one non-production worker must be in the <code>high_memory</code> group
 
 Inventory groups describe topology; `group_vars/all` supplies shared cluster settings; encrypted variables and environment overrides supply sensitive bootstrap values. Keep a node's Ansible host, advertised K3s address, and join address distinct. A public SSH endpoint can reach a node while its private address remains the correct address for server/agent traffic.
 
-Before a full run, verify targeting and resolved variables without exposing secrets:
+Before a full run, verify inventory topology, host connectivity, playbook syntax, targeted hosts, and available tags:
 
 ~~~bash
 ansible-inventory -i inventory.ini --graph

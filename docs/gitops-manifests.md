@@ -116,6 +116,8 @@ Waves order one sync operation; they are not a substitute for readiness. Each la
 
 Infrastructure Applications commonly combine an upstream Helm chart with values and supplemental resources from the FCI environment repository. The first source supplies versioned upstream templates; the `$values` source keeps local policy reviewable beside the rest of the environment.
 
+The example uses the reserved `.invalid` domain as a placeholder. Replace `https://charts.example.invalid` with the upstream chart repository URL before using the manifest.
+
 ~~~yaml
 spec:
   sources:
@@ -134,23 +136,23 @@ Pin upstream chart versions or source commits. `HEAD` is appropriate for the env
 
 ## Application promotion
 
-FCI service charts require an explicit image tag or digest. Argo CD Application parameters pin the promoted version; charts do not silently fall back to an app version that may not exist.
+FCI service charts require an explicit image tag or digest and do not silently fall back to an app version that may not exist. `image.digest` pins exact content and is required for immutable promotion; `image.tag` remains supported but is a mutable registry pointer. Environment Applications that still reference release tags are traceable, not content-pinned, and should move to the published digest during promotion.
 
 ~~~yaml
 spec:
   source:
     helm:
       parameters:
-        - name: image.tag
-          value: sha-abc123def456
+        - name: image.digest
+          value: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ~~~
 
 Application images live in <code>ghcr.io/freecloudinitiative</code>, and External Secrets materializes pull credentials into the backend and frontend namespaces.
 
 ## Adding or changing an application
 
-1. Change the service source repository and publish an immutable ARM64 image.
-2. Update the image tag/digest in the intended environment repository.
+1. Change the service source repository, publish the ARM64 image, and capture its `sha256:` digest.
+2. Update `image.digest` in the intended environment repository.
 3. Modify its colocated Helm chart if runtime configuration or Kubernetes resources changed.
 4. Run the repository validation suite.
 5. Merge; Argo CD detects the commit and converges the cluster.
@@ -175,7 +177,7 @@ Inspect the rendered object when validation fails instead of editing the cluster
 helm lint applications/api-gateway/chart
 helm template api-gateway applications/api-gateway/chart \
   --namespace backend \
-  --set image.tag=sha-test
+  --set image.digest=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 kubectl -n argocd get application api-gateway -o yaml
 kubectl -n argocd get application api-gateway \
   -o jsonpath='{.status.operationState.message}{"\n"}'
@@ -183,7 +185,7 @@ kubectl -n argocd get application api-gateway \
 
 ## Drift and rollback
 
-Argo CD reports desired-versus-live differences, prunes resources removed from Git, and self-heals managed fields. A rollback is therefore a Git operation: revert or promote the last known-good image/configuration, validate it, and let Argo CD converge. Before pruning a stateful resource, confirm whether its finalizer, PVC retention, or operator-specific deletion policy preserves data.
+Argo CD reports desired-versus-live differences. An Application prunes resources removed from Git only when `spec.syncPolicy.automated.prune` is enabled, and self-heals managed fields only when `spec.syncPolicy.automated.selfHeal` is enabled; the FCI environment Applications set both options. A rollback is therefore a Git operation: revert or promote the last known-good image/configuration, validate it, and let Argo CD converge. Before pruning a stateful resource, confirm whether its finalizer, PVC retention, or operator-specific deletion policy preserves data.
 
 ## Practice
 

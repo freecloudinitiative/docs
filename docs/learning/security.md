@@ -11,7 +11,9 @@ sequenceDiagram
     participant G as api-gateway
     participant I as iam-service
     participant S as domain service
-    User->>A: OIDC authorization code flow
+    User->>A: authorization request + PKCE challenge
+    A-->>User: redirect with authorization code
+    User->>A: token request + code + PKCE verifier
     A-->>User: access token
     User->>G: bearer token or API key
     G->>I: resolve platform account
