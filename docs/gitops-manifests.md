@@ -106,25 +106,53 @@ Argo CD sync waves and readiness protect this ordering, but two external bootstr
 
 Until Garage bootstrap completes, storage-service intentionally remains NotReady because its object-store readiness check performs <code>HeadBucket</code>.
 
+### Sync-wave implementation
+
+Infrastructure Applications use `argocd.argoproj.io/sync-wave` to express dependency order. For example, cert-manager, External Secrets, and Kyverno are wave 1; CloudNativePG is wave 2; Garage is wave 4 after secret configuration; Authentik is wave 5; Alloy is wave 6; kube-prometheus-stack is wave 9; and product applications follow at wave 11. Health-aware annotations and retry policies handle the difference between an object being accepted and its dependency becoming usable.
+
+Waves order one sync operation; they are not a substitute for readiness. Each later component must still retry safe startup dependencies, expose useful health, and tolerate a controller restart.
+
+### Multi-source Applications
+
+Infrastructure Applications commonly combine an upstream Helm chart with values and supplemental resources from the FCI environment repository. The first source supplies versioned upstream templates; the `$values` source keeps local policy reviewable beside the rest of the environment.
+
+The example uses the reserved `.invalid` domain as a placeholder. Replace `https://charts.example.invalid` with the upstream chart repository URL before using the manifest.
+
+~~~yaml
+spec:
+  sources:
+    - repoURL: https://charts.example.invalid
+      chart: operator
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $values/infrastructure/operator/values.yaml
+    - repoURL: https://github.com/freecloudinitiative/k3s-manifests.git
+      targetRevision: HEAD
+      ref: values
+~~~
+
+Pin upstream chart versions or source commits. `HEAD` is appropriate for the environment repository because the Application is intentionally following its own reviewed branch; it is not appropriate for an untrusted upstream dependency.
+
 ## Application promotion
 
-FCI service charts require an explicit image tag or digest. Argo CD Application parameters pin the promoted version; charts do not silently fall back to an app version that may not exist.
+FCI service charts require an explicit image tag or digest and do not silently fall back to an app version that may not exist. `image.digest` pins exact content and is required for immutable promotion; `image.tag` remains supported but is a mutable registry pointer. Environment Applications that still reference release tags are traceable, not content-pinned, and should move to the published digest during promotion.
 
 ~~~yaml
 spec:
   source:
     helm:
       parameters:
-        - name: image.tag
-          value: sha-abc123def456
+        - name: image.digest
+          value: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ~~~
 
 Application images live in <code>ghcr.io/freecloudinitiative</code>, and External Secrets materializes pull credentials into the backend and frontend namespaces.
 
 ## Adding or changing an application
 
-1. Change the service source repository and publish an immutable ARM64 image.
-2. Update the image tag/digest in the intended environment repository.
+1. Change the service source repository, publish the ARM64 image, and capture its `sha256:` digest.
+2. Update `image.digest` in the intended environment repository.
 3. Modify its colocated Helm chart if runtime configuration or Kubernetes resources changed.
 4. Run the repository validation suite.
 5. Merge; Argo CD detects the commit and converges the cluster.
@@ -142,6 +170,29 @@ The validation target lints YAML, lints and renders every Helm chart, schema-che
 ~~~bash
 make environment-check
 ~~~
+
+Inspect the rendered object when validation fails instead of editing the cluster:
+
+~~~bash
+helm lint applications/api-gateway/chart
+helm template api-gateway applications/api-gateway/chart \
+  --namespace backend \
+  --set image.digest=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+kubectl -n argocd get application api-gateway -o yaml
+kubectl -n argocd get application api-gateway \
+  -o jsonpath='{.status.operationState.message}{"\n"}'
+~~~
+
+## Drift and rollback
+
+Argo CD reports desired-versus-live differences. An Application prunes resources removed from Git only when `spec.syncPolicy.automated.prune` is enabled, and self-heals managed fields only when `spec.syncPolicy.automated.selfHeal` is enabled; the FCI environment Applications set both options. A rollback is therefore a Git operation: revert or promote the last known-good image/configuration, validate it, and let Argo CD converge. Before pruning a stateful resource, confirm whether its finalizer, PVC retention, or operator-specific deletion policy preserves data.
+
+## Practice
+
+1. Draw the sync dependency path for one product service.
+2. Render its chart with the promoted image and inspect RBAC, probes, and resource limits.
+3. Find one `ignoreDifferences` rule and explain which controller mutates the ignored field.
+4. Describe a Git rollback that does not accidentally delete persistent data.
 
 > [!WARNING]
 > **No manual drift as a deployment strategy**

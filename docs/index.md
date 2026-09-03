@@ -9,7 +9,7 @@ Explore the infrastructure, GitOps environments, Go services, and terminal-style
 
 <div class="hero-buttons" markdown>
 <a href="architecture/" class="btn-primary">[ EXPLORE ARCHITECTURE ]</a>
-<a href="repositories/" class="btn-outline">[ BROWSE 16 REPOSITORIES ]</a>
+<a href="learning-path/" class="btn-outline">[ START LEARNING ]</a>
 </div>
 
 <div class="terminal-status" markdown>
@@ -92,6 +92,12 @@ Looking for ownership? The [repository catalog](repositories.md) covers every or
 </div>
 
 </div>
+
+## Learn by operating the real stack
+
+Education is a core project output, not a side effect of the source code. The [Learning section](learning-path.md) turns FCI's working repositories into a structured DevOps curriculum: provision with Terraform, bootstrap with Ansible, build OCI images, operate Kubernetes and Argo CD, then study networking, security, data, observability, CI/CD, Go reconcilers, and the React console.
+
+Each guide explains the underlying technology, points to its concrete FCI implementation, calls out production tradeoffs, and ends with practical repository or cluster exercises.
 
 > [!NOTE]
 > **An evolving reference platform**

@@ -40,45 +40,6 @@
   --md-footer-bg-color--dark: var(--dash-bg);
 }
 
-[data-md-color-scheme="default"] {
-  --dash-bg: #ece0c8;
-  --dash-border: #9c7a45;
-  --dash-border-subtle: #c9b788;
-  --dash-label: #6b4a1e;
-  --dash-text: #2b2013;
-  --dash-text-dim: #76684e;
-  --dash-accent: #b5651d;
-  --dash-gold: #8a6d1f;
-  --dash-menu-bg: #ded0ad;
-  --dash-menu-hover: #cdbb90;
-  --dash-hover-bg: #e0d3b3;
-  --dash-tab-underline: #8a5a2a;
-  --dash-search-bg: #b5651d;
-  --dash-search-hover-bg: #cf7a2e;
-  --dash-search-text: #fdf6e8;
-  --dash-row-selected-bg: #d6c493;
-  --dash-input-bg: #e5d9c0;
-  --dash-input-text: #2b2013;
-  --dash-success: #3f7348;
-  --dash-danger: #a82424;
-
-  --md-default-bg-color: var(--dash-bg);
-  --md-default-fg-color: var(--dash-text);
-  --md-default-fg-color--light: var(--dash-text-dim);
-  --md-default-fg-color--lighter: #8a7a5c;
-  --md-default-fg-color--lightest: var(--dash-border-subtle);
-  --md-primary-fg-color: var(--dash-bg);
-  --md-primary-fg-color--light: var(--dash-hover-bg);
-  --md-primary-fg-color--dark: var(--dash-menu-bg);
-  --md-accent-fg-color: var(--dash-accent);
-  --md-accent-fg-color--transparent: rgba(181, 101, 29, 0.12);
-  --md-typeset-a-color: var(--dash-label);
-  --md-code-bg-color: var(--dash-input-bg);
-  --md-code-fg-color: var(--dash-input-text);
-  --md-footer-bg-color: var(--dash-menu-bg);
-  --md-footer-bg-color--dark: var(--dash-bg);
-}
-
 html {
   font-size: 100%;
 }
@@ -181,16 +142,13 @@ body {
 }
 
 .md-header__title {
-  color: var(--dash-text);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .md-header__button.md-logo {
   align-items: center;
   display: inline-flex;
-  margin-right: 0.2rem;
+  margin-right: 0.4rem;
   padding-right: 0;
   width: auto;
 }
@@ -201,10 +159,10 @@ body {
 }
 
 .md-header__button.md-logo::after {
-  color: var(--dash-accent);
-  content: "[ FCI ]";
+  color: var(--dash-text);
+  content: "[ FREE CLOUD INITIATIVE ]";
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   white-space: nowrap;
 }
@@ -298,12 +256,13 @@ body {
 
 .md-typeset .hero h1 {
   color: var(--dash-accent);
-  font-size: clamp(2rem, 6vw, 4.3rem);
+  font-size: clamp(1rem, 3.2vw, 3.5rem);
   font-weight: 800;
   letter-spacing: 0.055em;
   line-height: 1.08;
   margin: 1rem auto 1.25rem;
   text-shadow: 0 0 24px rgba(232, 160, 32, 0.24);
+  white-space: nowrap;
 }
 
 .md-typeset .hero > p {
