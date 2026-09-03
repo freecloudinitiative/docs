@@ -42,6 +42,9 @@
   --md-code-fg-color: var(--dash-input-text);
   --md-footer-bg-color: var(--dash-menu-bg);
   --md-footer-bg-color--dark: var(--dash-bg);
+  --md-footer-fg-color: var(--dash-text);
+  --md-footer-fg-color--light: var(--dash-text-dim);
+  --md-footer-fg-color--lighter: var(--dash-text-dim);
 }
 
 [data-md-color-scheme="default"] {
@@ -578,7 +581,23 @@ body {
 }
 
 .md-footer {
+  background: var(--dash-menu-bg);
   border-top: 1px solid var(--dash-border);
+  color: var(--dash-text);
+}
+
+.md-footer__link,
+.md-footer__title {
+  color: var(--dash-text);
+}
+
+.md-footer__direction {
+  color: var(--dash-text-dim);
+}
+
+.md-footer__link:hover .md-footer__title,
+.md-footer__link:focus-visible .md-footer__title {
+  color: var(--dash-accent);
 }
 
 ::-webkit-scrollbar {

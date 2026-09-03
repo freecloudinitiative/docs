@@ -5,47 +5,16 @@
 ## Repository-to-runtime map
 
 ```mermaid
-flowchart TB
-    subgraph Delivery["DELIVERY AND GOVERNANCE"]
-        GH[".github\nreusable CI workflows"]
-        RUN["terraform-multicloud-runner\nself-hosted Actions runners"]
-    end
-
-    subgraph Provision["INFRASTRUCTURE PROVISIONING"]
-        TF["terraform-multicloud-infra\nAWS · Azure · GCP · Civo · Linode"]
-        CF["terraform-cloudflare-infra\nDNS · Zero Trust tunnel"]
-    end
-
-    subgraph Bootstrap["BOOTSTRAP"]
-        ANS["ansible-automation\nnode setup · K3s · OpenBao · Argo CD"]
-    end
-
-    subgraph Desired["GITOPS DESIRED STATE"]
-        PROD["k3s-manifests\nproduction / bare metal"]
-        NONPROD["nonprod-k3s-manifests\nAWS non-production"]
-    end
-
-    subgraph Runtime["K3S RUNTIME"]
-        EDGE["cloudflared → Traefik"]
-        FOUND["Authentik · Postgres · Valkey\nGarage · Longhorn · CNPG"]
-        APPS["frontend · api-gateway\nIAM · compute · database · storage · terminal"]
-        OBS["Prometheus · Grafana\nLoki · Tempo · OTel · Alloy"]
-    end
-
-    GH --> RUN
-    RUN --> TF
-    TF --> ANS
-    CF --> EDGE
-    ANS --> PROD
-    ANS --> NONPROD
-    PROD --> Runtime
-    NONPROD --> Runtime
-    EDGE --> APPS
-    FOUND --> APPS
-    APPS --> OBS
+flowchart LR
+    A["01\nDELIVER"] --> B["02\nPROVISION"]
+    B --> C["03\nBOOTSTRAP"]
+    C --> D["04\nRECONCILE"]
+    D --> E["05\nRUN"]
+    E --> F["06\nSERVE"]
+    F --> G["07\nOPERATE"]
 ```
 
-The boxes above represent ownership, not a single pipeline that runs on every change. Production can run on owned Raspberry Pi hardware without `terraform-multicloud-infra`; non-production uses that Terraform repository to create its cloud nodes. Cloudflare is production-only, while each environment has its own GitOps repository and secret store.
+The stages above summarize ownership boundaries, not a single pipeline that runs on every change. Production can run on owned Raspberry Pi hardware without `terraform-multicloud-infra`; non-production uses that Terraform repository to create its cloud nodes. Cloudflare is production-only, while each environment has its own GitOps repository and secret store. The repository owners and handoffs for each stage are detailed below.
 
 ## Lifecycle boundaries
 
