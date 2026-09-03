@@ -142,26 +142,29 @@ body {
 }
 
 .md-header__title {
-  color: var(--dash-text);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .md-header__button.md-logo {
   align-items: center;
   display: inline-flex;
-  margin-right: 0.2rem;
+  margin-right: 0.4rem;
   padding-right: 0;
-  width: 2.3rem;
+  width: auto;
 }
 
 .md-header__button.md-logo img,
 .md-header__button.md-logo svg {
-  display: block;
-  height: 1.8rem;
-  object-fit: contain;
-  width: 1.8rem;
+  display: none;
+}
+
+.md-header__button.md-logo::after {
+  color: var(--dash-text);
+  content: "[ FREE CLOUD INITIATIVE ]";
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .md-search__form {
@@ -253,12 +256,13 @@ body {
 
 .md-typeset .hero h1 {
   color: var(--dash-accent);
-  font-size: clamp(2rem, 6vw, 4.3rem);
+  font-size: clamp(1rem, 3.2vw, 3.5rem);
   font-weight: 800;
   letter-spacing: 0.055em;
   line-height: 1.08;
   margin: 1rem auto 1.25rem;
   text-shadow: 0 0 24px rgba(232, 160, 32, 0.24);
+  white-space: nowrap;
 }
 
 .md-typeset .hero > p {
