@@ -79,6 +79,6 @@ When changing a cross-repository flow, update the detailed source documentation 
 - [ ] Architecture claims match current repository source.
 - [ ] Production and non-production behavior are not conflated.
 - [ ] `mkdocs build --strict` passes.
-- [ ] Both palettes are checked at desktop and mobile widths; dark remains the default.
+- [ ] The frontend-matched dark default and light sketch palettes are checked at desktop and mobile widths.
 
 [Browse repository ownership →](repositories.md){ .md-button .md-button--primary }

@@ -23,7 +23,7 @@ theme:
       accent: custom
       toggle:
         icon: material/brightness-7
-        name: Switch to light mode
+        name: Switch to light sketch mode
     - scheme: default
       primary: custom
       accent: custom
