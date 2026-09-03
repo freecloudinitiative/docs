@@ -22,6 +22,10 @@
   --dash-input-text: #a8d96c;
   --dash-success: #7ec87e;
   --dash-danger: #e0546a;
+  --dash-grid: rgba(58, 110, 165, 0.035);
+  --dash-hero-shadow: rgba(58, 110, 165, 0.08);
+  --dash-title-glow: rgba(232, 160, 32, 0.24);
+  --docs-font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --md-default-bg-color: var(--dash-bg);
   --md-default-fg-color: var(--dash-text);
@@ -41,37 +45,41 @@
 }
 
 [data-md-color-scheme="default"] {
-  --dash-bg: #f6f8fa;
-  --dash-border: #3a6ea5;
-  --dash-border-subtle: #bfd0e0;
-  --dash-label: #216d9e;
-  --dash-text: #17212b;
-  --dash-text-dim: #536273;
-  --dash-accent: #a85f00;
-  --dash-gold: #7f5b08;
-  --dash-menu-bg: #e8eef5;
-  --dash-menu-hover: #d9e5ef;
-  --dash-hover-bg: #e7f1fa;
-  --dash-tab-underline: #246eaa;
-  --dash-search-bg: #c9821e;
-  --dash-search-hover-bg: #b66e0f;
-  --dash-search-text: #101820;
-  --dash-row-selected-bg: #d7e7f4;
-  --dash-input-bg: #edf2f7;
-  --dash-input-text: #356814;
-  --dash-success: #337a46;
-  --dash-danger: #b3263e;
+  --dash-input-bg: #f5f5f5;
+  --dash-input-text: #1a1a1a;
+  --dash-bg: #ffffff;
+  --dash-border: #1a1a1a;
+  --dash-border-subtle: #4d4d4d;
+  --dash-label: #000000;
+  --dash-text: #1a1a1a;
+  --dash-text-dim: #6b6b6b;
+  --dash-accent: #3a3a3a;
+  --dash-gold: #555555;
+  --dash-menu-bg: #f7f7f5;
+  --dash-menu-hover: #eaeaea;
+  --dash-hover-bg: #f0f0ee;
+  --dash-tab-underline: #1a1a1a;
+  --dash-search-bg: #1a1a1a;
+  --dash-search-hover-bg: #3a3a3a;
+  --dash-search-text: #ffffff;
+  --dash-row-selected-bg: #e6e6e6;
+  --dash-success: #2f6f3e;
+  --dash-danger: #7a2020;
+  --dash-grid: rgba(26, 26, 26, 0.045);
+  --dash-hero-shadow: rgba(26, 26, 26, 0.1);
+  --dash-title-glow: transparent;
+  --docs-font-family: Caveat, "Chalkboard SE", "Comic Sans MS", "Courier New", monospace;
 
   --md-default-bg-color: var(--dash-bg);
   --md-default-fg-color: var(--dash-text);
   --md-default-fg-color--light: var(--dash-text-dim);
-  --md-default-fg-color--lighter: #6d7c8c;
+  --md-default-fg-color--lighter: #777777;
   --md-default-fg-color--lightest: var(--dash-border-subtle);
   --md-primary-fg-color: var(--dash-bg);
   --md-primary-fg-color--light: var(--dash-hover-bg);
   --md-primary-fg-color--dark: var(--dash-menu-bg);
   --md-accent-fg-color: var(--dash-accent);
-  --md-accent-fg-color--transparent: rgba(168, 95, 0, 0.12);
+  --md-accent-fg-color--transparent: rgba(58, 58, 58, 0.12);
   --md-typeset-a-color: var(--dash-label);
   --md-code-bg-color: var(--dash-input-bg);
   --md-code-fg-color: var(--dash-input-text);
@@ -84,14 +92,17 @@ html {
 }
 
 body,
-input {
-  font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+input,
+button,
+select,
+textarea {
+  font-family: var(--docs-font-family);
 }
 
 body {
   background:
-    linear-gradient(rgba(58, 110, 165, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(58, 110, 165, 0.035) 1px, transparent 1px),
+    linear-gradient(var(--dash-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--dash-grid) 1px, transparent 1px),
     var(--dash-bg);
   background-size: 28px 28px;
 }
@@ -201,7 +212,7 @@ body {
 }
 
 .md-header__button.md-logo::after {
-  color: var(--dash-text);
+  color: var(--dash-accent);
   content: "[ FREE CLOUD INITIATIVE ]";
   font-size: 0.72rem;
   font-weight: 700;
@@ -269,7 +280,7 @@ body {
   background: var(--dash-bg);
   border: 1px solid var(--dash-border);
   border-radius: 6px;
-  box-shadow: 0 0 0 1px rgba(58, 110, 165, 0.08), 0 18px 60px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 0 0 1px var(--dash-hero-shadow), 0 18px 60px rgba(0, 0, 0, 0.24);
   margin: 0 0 2.75rem;
   overflow: hidden;
   padding: clamp(2.4rem, 7vw, 5.5rem) clamp(1.2rem, 5vw, 4.5rem) 0;
@@ -303,7 +314,7 @@ body {
   letter-spacing: 0.055em;
   line-height: 1.08;
   margin: 1rem auto 1.25rem;
-  text-shadow: 0 0 24px rgba(232, 160, 32, 0.24);
+  text-shadow: 0 0 24px var(--dash-title-glow);
   white-space: nowrap;
 }
 
