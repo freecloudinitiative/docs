@@ -15,23 +15,12 @@ theme:
   name: material
   language: en
   logo: assets/logo.png
-  favicon: assets/favicon.png
+  favicon: assets/logo.png
   font: false
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
+    scheme: slate
+    primary: custom
+    accent: custom
   features:
     - navigation.tabs
     - navigation.tabs.sticky
@@ -100,9 +89,21 @@ nav:
     - "System overview": architecture.md
     - "Control plane": platform-services.md
     - "Repository catalog": repositories.md
-  - "[ BUILD PATH ]":
-    - learning-path.md
-    - "01 / Terraform": terraform.md
-    - "02 / Ansible & K3s": ansible-k3s.md
-    - "03 / GitOps & Argo CD": gitops-manifests.md
+  - "[ LEARNING ]":
+    - "Learning map": learning-path.md
+    - "Foundations":
+      - "01 / Terraform": terraform.md
+      - "02 / Ansible": ansible-k3s.md
+      - "03 / Docker & OCI": learning/docker.md
+      - "04 / Kubernetes & K3s": learning/kubernetes.md
+      - "05 / GitOps & Argo CD": gitops-manifests.md
+    - "Platform operations":
+      - "Networking & edge": learning/networking.md
+      - "Identity, secrets & policy": learning/security.md
+      - "Data & storage": learning/data-storage.md
+      - "Observability": learning/observability.md
+      - "CI/CD & supply chain": learning/ci-cd.md
+    - "Application platform":
+      - "Go control-plane patterns": learning/control-plane.md
+      - "React operator console": learning/frontend.md
   - "[ CONTRIBUTE ]": getting-started.md

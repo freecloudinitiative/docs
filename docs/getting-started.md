@@ -40,10 +40,10 @@ docs/
 ├── terraform.md            # infrastructure layer
 ├── ansible-k3s.md          # bootstrap layer
 ├── gitops-manifests.md     # production/non-production desired state
+├── learning/               # technology and platform operations guides
 ├── getting-started.md      # this contributor guide
 └── assets/
-    ├── logo.png
-    ├── favicon.png
+    ├── logo.png            # frontend logo used in header and browser tab
     └── custom.css          # frontend-aligned design tokens and components
 ```
 
@@ -69,7 +69,7 @@ When changing a cross-repository flow, update the detailed source documentation 
 - State environment differences explicitly.
 - Prefer Mermaid for flows and small tables for ownership mappings.
 - Use fenced code blocks with a language identifier.
-- Use Material admonitions for constraints and hazards.
+- Use GitHub-style alerts (`> [!NOTE]`, `> [!WARNING]`, and related forms) for constraints and hazards.
 - Keep the terminal visual vocabulary purposeful: bracketed labels, numbered stages, and exact frontend color tokens.
 
 ## Pull request checklist
@@ -79,6 +79,6 @@ When changing a cross-repository flow, update the detailed source documentation 
 - [ ] Architecture claims match current repository source.
 - [ ] Production and non-production behavior are not conflated.
 - [ ] `mkdocs build --strict` passes.
-- [ ] The site is checked at desktop and mobile widths in both palettes.
+- [ ] The dark site is checked at desktop and mobile widths.
 
 [Browse repository ownership →](repositories.md){ .md-button .md-button--primary }

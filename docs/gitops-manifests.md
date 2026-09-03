@@ -106,6 +106,32 @@ Argo CD sync waves and readiness protect this ordering, but two external bootstr
 
 Until Garage bootstrap completes, storage-service intentionally remains NotReady because its object-store readiness check performs <code>HeadBucket</code>.
 
+### Sync-wave implementation
+
+Infrastructure Applications use `argocd.argoproj.io/sync-wave` to express dependency order. For example, cert-manager, External Secrets, and Kyverno are wave 1; CloudNativePG is wave 2; Garage is wave 4 after secret configuration; Authentik is wave 5; Alloy is wave 6; kube-prometheus-stack is wave 9; and product applications follow at wave 11. Health-aware annotations and retry policies handle the difference between an object being accepted and its dependency becoming usable.
+
+Waves order one sync operation; they are not a substitute for readiness. Each later component must still retry safe startup dependencies, expose useful health, and tolerate a controller restart.
+
+### Multi-source Applications
+
+Infrastructure Applications commonly combine an upstream Helm chart with values and supplemental resources from the FCI environment repository. The first source supplies versioned upstream templates; the `$values` source keeps local policy reviewable beside the rest of the environment.
+
+~~~yaml
+spec:
+  sources:
+    - repoURL: https://charts.example.invalid
+      chart: operator
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $values/infrastructure/operator/values.yaml
+    - repoURL: https://github.com/freecloudinitiative/k3s-manifests.git
+      targetRevision: HEAD
+      ref: values
+~~~
+
+Pin upstream chart versions or source commits. `HEAD` is appropriate for the environment repository because the Application is intentionally following its own reviewed branch; it is not appropriate for an untrusted upstream dependency.
+
 ## Application promotion
 
 FCI service charts require an explicit image tag or digest. Argo CD Application parameters pin the promoted version; charts do not silently fall back to an app version that may not exist.
@@ -142,6 +168,29 @@ The validation target lints YAML, lints and renders every Helm chart, schema-che
 ~~~bash
 make environment-check
 ~~~
+
+Inspect the rendered object when validation fails instead of editing the cluster:
+
+~~~bash
+helm lint applications/api-gateway/chart
+helm template api-gateway applications/api-gateway/chart \
+  --namespace backend \
+  --set image.tag=sha-test
+kubectl -n argocd get application api-gateway -o yaml
+kubectl -n argocd get application api-gateway \
+  -o jsonpath='{.status.operationState.message}{"\n"}'
+~~~
+
+## Drift and rollback
+
+Argo CD reports desired-versus-live differences, prunes resources removed from Git, and self-heals managed fields. A rollback is therefore a Git operation: revert or promote the last known-good image/configuration, validate it, and let Argo CD converge. Before pruning a stateful resource, confirm whether its finalizer, PVC retention, or operator-specific deletion policy preserves data.
+
+## Practice
+
+1. Draw the sync dependency path for one product service.
+2. Render its chart with the promoted image and inspect RBAC, probes, and resource limits.
+3. Find one `ignoreDifferences` rule and explain which controller mutates the ignored field.
+4. Describe a Git rollback that does not accidentally delete persistent data.
 
 > [!WARNING]
 > **No manual drift as a deployment strategy**

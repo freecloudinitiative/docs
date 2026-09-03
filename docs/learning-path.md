@@ -1,13 +1,16 @@
-# Build path
+# Learning
 
-<span class="page-lede">Follow the same ownership boundaries the platform uses: provision infrastructure, bootstrap the cluster, hand it to GitOps, then trace a product request through the control plane.</span>
+<span class="page-lede">Build practical DevOps knowledge from the same ownership boundaries FCI uses: provision infrastructure, bootstrap the cluster, package workloads, reconcile desired state, operate platform services, and trace product requests through the control plane.</span>
+
+Producing educational DevOps content is one of Free Cloud Initiative's core goals. These guides teach each technology in context while keeping the live repositories as the implementation source of truth. You can follow the curriculum end to end or enter at the layer you operate.
 
 ```mermaid
 flowchart LR
     A["01\nPROVISION"] --> B["02\nBOOTSTRAP"]
-    B --> C["03\nRECONCILE"]
-    C --> D["04\nSERVE"]
-    D --> E["05\nOBSERVE"]
+    B --> C["03\nPACKAGE"]
+    C --> D["04\nORCHESTRATE"]
+    D --> E["05\nRECONCILE"]
+    E --> F["06\nOPERATE"]
 ```
 
 ## 01 / Provision
@@ -34,7 +37,23 @@ Pay particular attention to the ownership cutover: Ansible owns the one-time pre
 
 [Open the Ansible and K3s guide →](ansible-k3s.md){ .md-button .md-button--primary }
 
-## 03 / Reconcile
+## 03 / Package
+
+**Repositories:** all application and service repositories
+
+Learn how multi-stage Dockerfiles compile the React application and statically linked Go services, remove build tooling from runtime images, run as non-root users, and publish `linux/arm64` artifacts to GHCR. Then follow an immutable commit-derived tag into a GitOps release.
+
+[Open the Docker and OCI guide →](learning/docker.md){ .md-button .md-button--primary }
+
+## 04 / Orchestrate
+
+**Repositories:** `ansible-automation`, both GitOps repositories, and the domain services
+
+Study Kubernetes primitives, K3s distribution choices, scheduling tiers, health probes, storage classes, RBAC, tenant namespaces, and the difference between platform GitOps controllers and product reconcilers.
+
+[Open the Kubernetes and K3s guide →](learning/kubernetes.md){ .md-button .md-button--primary }
+
+## 05 / Reconcile
 
 **Repositories:** `k3s-manifests` and `nonprod-k3s-manifests`
 
@@ -50,7 +69,7 @@ This stage covers:
 
 [Open the GitOps guide →](gitops-manifests.md){ .md-button .md-button--primary }
 
-## 04 / Serve
+## 06 / Serve
 
 **Repositories:** `frontend`, `api-gateway`, `iam-service`, `compute-service`, `database-service`, `storage-service`, `terminal-gateway`, and `platform-common`
 
@@ -66,11 +85,21 @@ Focus on the boundaries:
 
 [Open the control-plane guide →](platform-services.md){ .md-button .md-button--primary }
 
-## 05 / Observe and operate
+## 07 / Operate the stack
 
 **Repositories:** GitOps environment, service, and `.github` repositories
 
 Connect service RED/domain metrics, structured logs, traces, readiness checks, and worker queue health to the deployed Prometheus, Grafana, Loki, Tempo, OpenTelemetry, and Alloy stack. Then inspect the shared CI workflows that verify source and build ARM64 images.
+
+Choose a platform track:
+
+- [Networking and edge](learning/networking.md): Cloudflare, Traefik, MetalLB, Services, DNS, TLS, and NetworkPolicy.
+- [Identity, secrets, and policy](learning/security.md): Authentik, IAM, OpenBao, External Secrets, Kyverno, RBAC, and terminal tickets.
+- [Data and storage](learning/data-storage.md): CloudNativePG, PostgreSQL schemas, Valkey, Garage, Longhorn, and backups.
+- [Observability](learning/observability.md): Prometheus, Grafana, Loki, Tempo, OpenTelemetry, Alloy, and incident correlation.
+- [CI/CD and supply chain](learning/ci-cd.md): reusable workflows, ARM64 builds, GHCR, immutable promotion, and GitOps delivery.
+- [Go control-plane patterns](learning/control-plane.md): service trust, transactions, work queues, reconciliation, and testing.
+- [React operator console](learning/frontend.md): OIDC, server/UI state, ticketed terminals, builds, and accessibility.
 
 Useful questions to answer:
 
@@ -85,10 +114,13 @@ Useful questions to answer:
 2. [Repository catalog](repositories.md)
 3. [Infrastructure with Terraform](terraform.md)
 4. [Cluster bootstrap with Ansible](ansible-k3s.md)
-5. [GitOps environments](gitops-manifests.md)
-6. [Control-plane services](platform-services.md)
+5. [Docker and OCI images](learning/docker.md)
+6. [Kubernetes and K3s](learning/kubernetes.md)
+7. [GitOps environments](gitops-manifests.md)
+8. [Control-plane services](platform-services.md)
+9. Pick a platform operations track above and complete its practice exercises.
 
 > [!TIP]
 > **You understand the platform when…**
 >
-> You can route a change to its owning repository, explain the bootstrap-to-GitOps cutover, trace a browser request to runtime state, and identify which environment-specific repository will deploy it.
+> You can route a change to its owning repository, explain the bootstrap-to-GitOps cutover, trace source into an immutable image and running workload, follow a browser request to reconciled state, and choose the right signal when that path fails.

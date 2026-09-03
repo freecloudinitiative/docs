@@ -37,6 +37,12 @@ terraform-multicloud-infra/
 
 Implemented resources vary by provider. GCP and AWS include the fullest node/network/firewall models; AWS also supports a secondary VPC with peering. Civo and Linode define provider-native instances and firewalls. The Azure root is earlier-stage and currently contains only part of the intended cluster resource set.
 
+### Provider and state boundaries
+
+The cluster roots currently constrain the AWS provider to major version 5, Google to 5, AzureRM to 3, Civo to 1.1, and Linode to 2. The Cloudflare root requires Terraform 1.5 or newer and constrains Cloudflare to major version 4. Treat these constraints as compatibility ranges, not an instruction to upgrade automatically: refresh lock files and inspect provider release notes in the repository that owns the root.
+
+Every root has an independent state address space. Resource addresses such as `aws_instance.master[0]` are meaningful only with the matching root configuration, variables, provider account, and state. Copying resources between directories without an explicit state migration can cause Terraform to propose destruction and recreation.
+
 > [!NOTE]
 > **Treat each provider root independently**
 >
@@ -52,6 +58,22 @@ terraform init
 terraform plan
 terraform apply
 terraform output
+~~~
+
+Read a plan by operation, not only by its summary:
+
+- `+` creates a new remote object;
+- `~` changes one in place;
+- `-/+` replaces it and can interrupt a node or network path;
+- `-` destroys it;
+- `(known after apply)` means a downstream value cannot be finalized during planning.
+
+Save an authorized production plan and apply that exact artifact so the reviewed operations and executed operations are the same:
+
+~~~bash
+terraform plan -out=tfplan
+terraform show tfplan
+terraform apply tfplan
 ~~~
 
 Restrict SSH CIDRs before applying. Defaults that allow <code>0.0.0.0/0</code> are development conveniences, not a safe deployment policy.
@@ -107,5 +129,23 @@ terraform validate
 ~~~
 
 Run <code>init</code> and <code>validate</code> in each root you changed.
+
+## Change workflow and recovery
+
+1. Select exactly one provider root and confirm the workspace/state backend.
+2. Format and validate without credentials where possible.
+3. Plan with the intended account and variable set; review replacements and firewall exposure.
+4. Apply the saved plan through the authorized workflow.
+5. Export the resulting node addresses into the correct Ansible inventory.
+6. Verify reachability before bootstrap; Terraform success does not prove SSH or K3s join paths are usable.
+
+If apply fails partway, do not delete state or immediately rerun with changed configuration. Refresh, inspect state and the cloud console, then produce a new plan. Import existing objects or move state addresses only after documenting the ownership correction.
+
+## Practice
+
+1. Run `terraform providers` in two roots and compare their dependency graphs.
+2. Identify every value that crosses from Terraform output into Ansible inventory.
+3. Change a harmless tag in a test root and explain the plan symbols.
+4. Describe the recovery path for a resource created remotely but missing from state.
 
 [Continue to cluster bootstrap →](ansible-k3s.md){ .md-button .md-button--primary }
